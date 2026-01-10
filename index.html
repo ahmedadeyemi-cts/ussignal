@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>US Signal | On-Call Schedule</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body class="dark">
+  <header class="topbar">
+    <div class="brand">US Signal · On-Call</div>
+    <div class="actions">
+      <select id="deptFilter">
+        <option value="all">All Departments</option>
+        <option value="enterprise_network">Enterprise Network</option>
+        <option value="collaboration">Collaboration</option>
+        <option value="system_storage">System & Storage</option>
+      </select>
+      <button id="themeToggle">☀ / 🌙</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <h1>On-Call Schedule (CST)</h1>
+    <p class="subtle">
+      Read-only view. Times are displayed in <b>Central Standard Time (CST)</b>.
+    </p>
+
+    <div id="schedule"></div>
+  </main>
+
+  <footer class="footer">
+    © US Signal · Read-Only Schedule
+  </footer>
+
+  <script src="app.js"></script>
+  <script>
+    initApp({ admin: false });
+  </script>
+</body>
+</html>
