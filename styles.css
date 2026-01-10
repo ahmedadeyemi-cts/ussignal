@@ -1,0 +1,103 @@
+:root {
+  --bg-dark: #0b1a33;
+  --bg-light: #f6f8fb;
+  --card-dark: #13284a;
+  --card-light: #ffffff;
+  --text-dark: #ffffff;
+  --text-light: #0b1a33;
+  --accent: #3da9fc;
+  --border-radius: 12px;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+}
+
+body.dark {
+  background: var(--bg-dark);
+  color: var(--text-dark);
+}
+
+body.light {
+  background: var(--bg-light);
+  color: var(--text-light);
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  background: linear-gradient(90deg, #071225, #0b1a33);
+}
+
+.brand {
+  font-weight: 700;
+  letter-spacing: 0.4px;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+}
+
+select, button {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+}
+
+.container {
+  max-width: 1100px;
+  margin: auto;
+  padding: 32px 16px;
+}
+
+.subtle {
+  opacity: 0.75;
+}
+
+.schedule-card {
+  background: var(--card-dark);
+  border-radius: var(--border-radius);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+body.light .schedule-card {
+  background: var(--card-light);
+}
+
+.entry-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.entry {
+  border-left: 4px solid var(--accent);
+  padding-left: 10px;
+}
+
+.entry h4 {
+  margin: 4px 0;
+}
+
+.admin-bar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.warn {
+  background: #ff6b6b;
+  color: #fff;
+}
+
+.footer {
+  text-align: center;
+  padding: 20px;
+  opacity: 0.6;
+}
