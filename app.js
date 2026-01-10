@@ -280,6 +280,24 @@ function validateOnCallWindow(startISO, endISO) {
 
   return null;
 }
+// ADD — Friday helpers
+function isFriday(date) {
+  return date.getDay() === 5;
+}
+
+function nearestFriday(date) {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = (5 - day + 7) % 7;
+  d.setDate(d.getDate() + diff);
+  return d;
+}
+
+function toLocalDateTimeInputValue(date) {
+  const pad = n => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 /* =========================
  * Public schedule
  * ========================= */
@@ -309,7 +327,26 @@ function renderScheduleReadOnly(scheduleDiv, entries) {
     card.innerHTML = `
       <div class="card-head">
         <div>
-          <div class="card-title">${escapeHtml(start)} → ${escapeHtml(end)}</div>
+          ${isEditing ? `
+  <div class="inline-row">
+    <label>Start</label>
+    <input type="datetime-local"
+           data-time-edit="start"
+           data-id="${entry.id}"
+           value="${startInput}" />
+  </div>
+  <div class="inline-row">
+    <label>End</label>
+    <input type="datetime-local"
+           data-time-edit="end"
+           data-id="${entry.id}"
+           value="${endInput}" />
+  </div>
+  <div class="small subtle">CST · Fri 4:00 PM → Fri 7:00 AM</div>
+` : `
+  <div class="card-title">${escapeHtml(startDisplay)} → ${escapeHtml(endDisplay)}</div>
+`}
+
           <div class="small">Read-only · All departments</div>
         </div>
       </div>
@@ -414,7 +451,26 @@ function renderScheduleAdmin(scheduleDiv) {
     card.innerHTML = `
       <div class="card-head">
         <div>
-          <div class="card-title">${escapeHtml(start)} → ${escapeHtml(end)}</div>
+          ${isEditing ? `
+  <div class="inline-row">
+    <label>Start</label>
+    <input type="datetime-local"
+           data-time-edit="start"
+           data-id="${entry.id}"
+           value="${startInput}" />
+  </div>
+  <div class="inline-row">
+    <label>End</label>
+    <input type="datetime-local"
+           data-time-edit="end"
+           data-id="${entry.id}"
+           value="${endInput}" />
+  </div>
+  <div class="small subtle">CST · Fri 4:00 PM → Fri 7:00 AM</div>
+` : `
+  <div class="card-title">${escapeHtml(startDisplay)} → ${escapeHtml(endDisplay)}</div>
+`}
+
           <div class="small">Entry ID: ${escapeHtml(String(entry.id))}</div>
         </div>
         <div class="card-actions">
@@ -432,6 +488,37 @@ function renderScheduleAdmin(scheduleDiv) {
 
     scheduleDiv.appendChild(card);
   });
+
+  // ADD — time editor wiring
+scheduleDiv.querySelectorAll("input[data-time-edit]").forEach(inp => {
+  inp.onchange = () => {
+    const id = inp.getAttribute("data-id");
+    const field = inp.getAttribute("data-time-edit");
+    const entry = APP_STATE.draftSchedule.entries.find(e => String(e.id) === String(id));
+    if (!entry) return;
+
+    let d = new Date(inp.value);
+
+    // Enforce Friday
+    if (!isFriday(d)) {
+      d = nearestFriday(d);
+    }
+
+    // Enforce fixed times
+    if (field === "start") {
+      d.setHours(16, 0, 0, 0); // Fri 4:00 PM
+      entry.startISO = toLocalDateTimeInputValue(d) + ":00";
+    }
+
+    if (field === "end") {
+      d.setHours(7, 0, 0, 0); // Fri 7:00 AM
+      entry.endISO = toLocalDateTimeInputValue(d) + ":00";
+    }
+
+    inp.value = toLocalDateTimeInputValue(d);
+  };
+});
+
 
   // wire card actions and inline input listeners
   scheduleDiv.querySelectorAll("button[data-action]").forEach(btn => {
@@ -491,34 +578,78 @@ function deepClone(obj) {
   return JSON.parse(JSON.stringify(obj));
 }
 
+// ADD — overlap detection
+function detectOverlaps(entries) {
+  const sorted = [...entries].sort(
+    (a, b) => new Date(a.startISO) - new Date(b.startISO)
+  );
+
+  const overlaps = [];
+
+  for (let i = 1; i < sorted.length; i++) {
+    const prev = sorted[i - 1];
+    const curr = sorted[i];
+
+    const prevEnd = new Date(prev.endISO);
+    const currStart = new Date(curr.startISO);
+
+    if (currStart < prevEnd) {
+      overlaps.push({
+        prevId: prev.id,
+        currId: curr.id,
+        message: `Entry ${curr.id} overlaps with entry ${prev.id}`
+      });
+    }
+  }
+
+  return overlaps;
+}
+
 /* =========================
  * Admin actions
  * ========================= */
 
 async function saveAllChanges() {
-  const schedule = APP_STATE.draftSchedule;
-  if (!schedule || !Array.isArray(schedule.entries)) throw new Error("Draft schedule is missing.");
+  const original = APP_STATE.scheduleFull;
+  const draft = APP_STATE.draftSchedule;
 
-  // optional: minimal validation
-  for (const e of schedule.entries) {
-    for (const k of Object.keys(e.departments || {})) {
-      const p = e.departments[k] || {};
-      if (p.email && !String(p.email).includes("@")) {
-        throw new Error(`Invalid email in ${DEPT_LABELS[k]} for entry ${e.id}`);
-      }
-    }
+  const diffs = diffSchedules(original, draft);
+  if (diffs.length === 0) {
+    toast("No changes detected.");
+    return;
   }
 
-  const res = await fetch(`${API_BASE}/admin/oncall/save`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ schedule })
-  });
+  for (const e of draft.entries) {
+    const err = validateOnCallWindow(e.startISO, e.endISO);
+    if (err) throw new Error(`Entry ${e.id}: ${err}`);
+  }
 
-  if (!res.ok) throw new Error(await res.text());
-  toast("Schedule saved.");
-  // reload schedule from server to ensure parity
-  await loadScheduleAdmin(byId("schedule"));
+  confirmModal(
+    "Confirm Schedule Changes",
+    `
+      <b>${diffs.length} change(s):</b>
+      <ul>${diffs.map(d => `<li>${escapeHtml(d)}</li>`).join("")}</ul>
+      <p>This will overwrite the current schedule.</p>
+    `,
+    async () => {
+      const res = await fetch(`${API_BASE}/admin/oncall/save`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ schedule: draft })
+      });
+
+      if (!res.ok) throw new Error(await res.text());
+      toast("Schedule saved.");
+      await loadScheduleAdmin(byId("schedule"));
+    }
+    const overlaps = detectOverlaps(draft.entries);
+if (overlaps.length > 0) {
+  throw new Error(
+    overlaps.map(o => o.message).join("; ")
+  );
+}
+
+  );
 }
 
 async function exportExcelAdmin() {
@@ -560,7 +691,32 @@ async function runAutogen() {
   toast("Auto-generated schedule.");
   await loadScheduleAdmin(byId("schedule"));
 }
+// ADD — schedule diff helper
+function diffSchedules(original, draft) {
+  const diffs = [];
 
+  original.entries.forEach((o, i) => {
+    const d = draft.entries[i];
+    if (!d) return;
+
+    if (o.startISO !== d.startISO || o.endISO !== d.endISO) {
+      diffs.push(`Entry ${o.id}: on-call window changed`);
+    }
+
+    for (const dept of Object.keys(o.departments || {})) {
+      const op = o.departments[dept] || {};
+      const dp = d.departments[dept] || {};
+
+      ["name", "email", "phone"].forEach(f => {
+        if ((op[f] || "") !== (dp[f] || "")) {
+          diffs.push(`Entry ${o.id} (${DEPT_LABELS[dept]}): ${f} changed`);
+        }
+      });
+    }
+  });
+
+  return diffs;
+}
 /* =========================
  * Roster management UI
  * ========================= */
@@ -650,23 +806,50 @@ function renderRosterDept(deptKey) {
 }
 
 function rosterAddUserPrompt() {
-  // lightweight prompt flow; you can replace with a nicer modal later
-  const dept = prompt("Department key: enterprise_network, collaboration, or system_storage", "enterprise_network");
-  const deptKey = String(dept || "").trim();
-  if (!DEPT_KEYS.includes(deptKey)) {
-    toast("Invalid department key.");
-    return;
-  }
+  byId("modalTitle").textContent = "Add Roster User";
+  byId("modalBody").innerHTML = `
+    <div class="form-grid">
+      <div class="field">
+        <label>Department</label>
+        <select id="newUserDept">
+          <option value="enterprise_network">Enterprise Network</option>
+          <option value="collaboration">Collaboration</option>
+          <option value="system_storage">System & Storage</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Name</label>
+        <input id="newUserName" />
+      </div>
+      <div class="field">
+        <label>Email</label>
+        <input id="newUserEmail" />
+      </div>
+      <div class="field">
+        <label>Phone</label>
+        <input id="newUserPhone" />
+      </div>
+    </div>
+  `;
 
-  const name = prompt("Name:", "");
-  const email = prompt("Email:", "");
-  const phone = prompt("Phone (optional):", "");
+  byId("modalOk").onclick = () => {
+    const dept = byId("newUserDept").value;
+    const name = byId("newUserName").value.trim();
+    const email = byId("newUserEmail").value.trim();
+    const phone = byId("newUserPhone").value.trim();
 
-  if (!ROSTER_STATE) ROSTER_STATE = { enterprise_network: [], collaboration: [], system_storage: [] };
-  ROSTER_STATE[deptKey].push({ name: name || "", email: email || "", phone: phone || "" });
+    if (!name || !email) {
+      toast("Name and email are required.");
+      return;
+    }
 
-  renderRoster();
-  toast("User added to roster (not saved yet).");
+    ROSTER_STATE[dept].push({ name, email, phone });
+    hideModal();
+    renderRoster();
+    toast("User added to roster (not saved yet).");
+  };
+
+  byId("modal").classList.remove("hidden");
 }
 
 async function saveRoster() {
