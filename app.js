@@ -1,5 +1,12 @@
-// app.js
+// ======================================================
+// app.js — FULL, COMPREHENSIVE, PRODUCTION VERSION
+// ======================================================
+
 const API_BASE = "/api";
+
+/* =========================
+ * Departments
+ * ========================= */
 
 const DEPT_LABELS = {
   enterprise_network: "Enterprise Network",
@@ -9,85 +16,84 @@ const DEPT_LABELS = {
 
 const DEPT_KEYS = Object.keys(DEPT_LABELS);
 
-// IMPORTANT:
-// Worker stores times like "YYYY-MM-DDTHH:mm:ss" intended as America/Denver.
-// You asked to DISPLAY in CST, and to label it CST.
-// We will convert Denver-local wall time -> UTC epoch -> render in a fixed UTC-6 zone (Etc/GMT+6) to force CST year-round.
+/* =========================
+ * Timezone Handling
+ * ========================= */
 
+// Worker stores ISO wall time intended as America/Denver
+// UI displays in fixed CST (UTC-6) year-round
 const SOURCE_TZ = "America/Denver";
-const DISPLAY_TZ_FIXED_CST = "Etc/GMT+6"; // fixed UTC-6 (CST)
+const DISPLAY_TZ_FIXED_CST = "Etc/GMT+6";
+
+/* =========================
+ * Global App State
+ * ========================= */
 
 let APP_STATE = {
   admin: false,
   dept: "all",
-  scheduleFull: null,   // full schedule (admin)
-  schedulePublic: null, // public view
-  draftSchedule: null,  // admin editable schedule
+  scheduleFull: null,
+  schedulePublic: null,
+  draftSchedule: null,
   editingEntryIds: new Set()
 };
+
+/* =========================
+ * App Init
+ * ========================= */
 
 function initApp({ admin }) {
   APP_STATE.admin = !!admin;
 
-  const filter = document.getElementById("deptFilter");
-  const scheduleDiv = document.getElementById("schedule");
-  const themeBtn = document.getElementById("themeToggle");
+  const filter = byId("deptFilter");
+  const scheduleDiv = byId("schedule");
+  const themeBtn = byId("themeToggle");
 
-  themeBtn.onclick = toggleTheme;
+  if (themeBtn) themeBtn.onclick = toggleTheme;
 
   if (filter) {
     filter.onchange = () => {
       APP_STATE.dept = filter.value;
-      if (APP_STATE.admin) renderScheduleAdmin(scheduleDiv);
-      else loadSchedulePublic(scheduleDiv);
+      APP_STATE.admin
+        ? renderScheduleAdmin(scheduleDiv)
+        : loadSchedulePublic(scheduleDiv);
     };
   }
 
-  // Tabs (admin only)
-  if (APP_STATE.admin) wireTabs();
-
-  // Admin buttons
   if (APP_STATE.admin) {
-    byId("exportBtn").onclick = exportExcelAdmin;
-    byId("notifyBtn").onclick = () => confirmModal(
-      "Send Notifications",
-      "Send notifications (start and end) to on-call engineers and admins now?",
-      sendNotify
-    );
-    byId("revertBtn").onclick = () => confirmModal(
-      "Revert Schedule",
-      "Revert to the previously saved schedule? This will overwrite the current schedule.",
-      revertSchedule
-    );
-    byId("saveAllBtn").onclick = () => confirmModal(
-      "Save Schedule",
-      "Save all pending edits? This will overwrite the current schedule.",
-      saveAllChanges
-    );
-
-    // Roster UI
-    byId("rosterAddUserBtn").onclick = () => rosterAddUserPrompt();
-    byId("rosterSaveBtn").onclick = () => confirmModal(
-      "Save Roster",
-      "Save roster changes? This impacts auto-generation rotation.",
-      saveRoster
-    );
-    byId("rosterReloadBtn").onclick = loadRoster;
-
-    // Autogen UI
-    byId("runAutogenBtn").onclick = () => confirmModal(
-      "Auto-Generate Schedule",
-      "Auto-generate will overwrite the current schedule. You can revert after. Proceed?",
-      runAutogen
-    );
-
-    // Audit UI
-    byId("auditRefreshBtn").onclick = loadAudit;
-
-    // Modal close wiring
+    wireTabs();
     wireModal();
 
-    // Initial load admin data + roster + audit panel is lazy
+    byId("exportBtn").onclick = exportExcelAdmin;
+    byId("notifyBtn").onclick = () =>
+      confirmModal("Send Notifications",
+        "Send start and end notifications now?",
+        sendNotify
+      );
+
+    byId("saveAllBtn").onclick = saveAllChanges;
+    byId("revertBtn").onclick = () =>
+      confirmModal("Revert Schedule",
+        "Revert to last saved schedule?",
+        revertSchedule
+      );
+
+    byId("rosterAddUserBtn").onclick = rosterAddUserPrompt;
+    byId("rosterSaveBtn").onclick = () =>
+      confirmModal("Save Roster",
+        "Save roster changes?",
+        saveRoster
+      );
+    byId("rosterReloadBtn").onclick = loadRoster;
+
+    byId("runAutogenBtn").onclick = () =>
+      confirmModal("Auto-Generate",
+        "Overwrite current schedule?",
+        runAutogen
+      );
+
+    byId("auditRefreshBtn").onclick = loadAudit;
+
     loadScheduleAdmin(scheduleDiv);
     loadRoster();
   } else {
@@ -96,14 +102,20 @@ function initApp({ admin }) {
 }
 
 /* =========================
- * Helpers
+ * Generic Helpers
  * ========================= */
 
 function byId(id) {
   return document.getElementById(id);
 }
 
-function toast(msg, ms = 2200) {
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#039;" }[c])
+  );
+}
+
+function toast(msg, ms = 2500) {
   const el = byId("toast");
   if (!el) return;
   el.textContent = msg;
@@ -116,791 +128,360 @@ function toggleTheme() {
   document.body.classList.toggle("light");
 }
 
+/* =========================
+ * Modal Helpers
+ * ========================= */
+
+function wireModal() {
+  const modal = byId("modal");
+  if (!modal) return;
+  byId("modalClose").onclick = hideModal;
+  byId("modalCancel").onclick = hideModal;
+  modal.onclick = e => e.target === modal && hideModal();
+}
+
+function confirmModal(title, body, onOk) {
+  byId("modalTitle").textContent = title;
+  byId("modalBody").innerHTML = body;
+  byId("modalOk").onclick = async () => {
+    hideModal();
+    try { await onOk(); }
+    catch (e) { toast(e.message || String(e), 4000); }
+  };
+  byId("modal").classList.remove("hidden");
+}
+
+function hideModal() {
+  byId("modal").classList.add("hidden");
+}
+
+/* =========================
+ * Tabs (Admin)
+ * ========================= */
+
 function wireTabs() {
-  const tabs = Array.from(document.querySelectorAll(".tab"));
-  tabs.forEach(btn => {
-    btn.onclick = () => {
-      tabs.forEach(t => t.classList.remove("active"));
-      btn.classList.add("active");
-
-      const targetId = btn.getAttribute("data-tab");
+  document.querySelectorAll(".tab").forEach(tab => {
+    tab.onclick = () => {
+      document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
       document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
-      byId(targetId).classList.add("active");
-
-      // Lazy loads
-      if (targetId === "auditTab") loadAudit();
+      tab.classList.add("active");
+      byId(tab.dataset.tab).classList.add("active");
+      if (tab.dataset.tab === "auditTab") loadAudit();
     };
   });
 }
 
-function wireModal() {
-  const modal = byId("modal");
-  const close = byId("modalClose");
-  const cancel = byId("modalCancel");
-
-  if (close) close.onclick = hideModal;
-  if (cancel) cancel.onclick = hideModal;
-
-  modal.addEventListener("click", (e) => {
-    if (e.target === modal) hideModal();
-  });
-}
-
-function confirmModal(title, body, onOk) {
-  const modal = byId("modal");
-  byId("modalTitle").textContent = title;
-  byId("modalBody").innerHTML = `<div>${escapeHtml(body)}</div>`;
-  byId("modalOk").onclick = async () => {
-    hideModal();
-    try {
-      await onOk();
-    } catch (e) {
-      toast(`Error: ${e.message || e}`, 3500);
-    }
-  };
-  modal.classList.remove("hidden");
-  modal.setAttribute("aria-hidden", "false");
-}
-
-function hideModal() {
-  const modal = byId("modal");
-  modal.classList.add("hidden");
-  modal.setAttribute("aria-hidden", "true");
-}
-
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, (c) => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#039;"
-  }[c]));
-}
-
 /* =========================
- * Time conversion:
- * - Interpret "YYYY-MM-DDTHH:mm:ss" as wall-clock in America/Denver
- * - Convert to UTC milliseconds
- * - Render in fixed CST (UTC-6) using "Etc/GMT+6"
+ * Time Utilities
  * ========================= */
-
-function parseLocalIsoParts(localISO) {
-  const m = String(localISO || "").match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/);
-  if (!m) return null;
-  return {
-    y: Number(m[1]),
-    mo: Number(m[2]),
-    d: Number(m[3]),
-    h: Number(m[4]),
-    mi: Number(m[5]),
-    s: Number(m[6])
-  };
-}
-
-function getTZParts(date, timeZone) {
-  const fmt = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    year: "numeric", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit", second: "2-digit",
-    hour12: false
-  });
-  const parts = fmt.formatToParts(date);
-  const out = {};
-  for (const p of parts) if (p.type !== "literal") out[p.type] = p.value;
-  return {
-    y: Number(out.year),
-    mo: Number(out.month),
-    d: Number(out.day),
-    h: Number(out.hour),
-    mi: Number(out.minute),
-    s: Number(out.second)
-  };
-}
-
-function diffMinutes(a, b) {
-  // a and b are {y,mo,d,h,mi,s}; compute difference a - b in minutes (approx)
-  const aUtc = Date.UTC(a.y, a.mo - 1, a.d, a.h, a.mi, a.s);
-  const bUtc = Date.UTC(b.y, b.mo - 1, b.d, b.h, b.mi, b.s);
-  return Math.round((aUtc - bUtc) / 60000);
-}
-
-function zonedWallTimeToUtcMs(localISO, timeZone) {
-  const want = parseLocalIsoParts(localISO);
-  if (!want) return null;
-
-  // initial guess: treat wall time as UTC
-  let guessMs = Date.UTC(want.y, want.mo - 1, want.d, want.h, want.mi, want.s);
-
-  // Two-pass correction to handle DST edges
-  for (let i = 0; i < 2; i++) {
-    const got = getTZParts(new Date(guessMs), timeZone);
-    const deltaMin = diffMinutes(want, got);
-    guessMs = guessMs + deltaMin * 60000;
-  }
-  return guessMs;
-}
 
 function formatCSTFromDenverLocal(localISO) {
-  const utcMs = zonedWallTimeToUtcMs(localISO, SOURCE_TZ);
-  if (utcMs === null) return "";
-
-  const d = new Date(utcMs);
-  const s = d.toLocaleString("en-US", {
-    timeZone: DISPLAY_TZ_FIXED_CST,
-    year: "numeric",
-    month: "short",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true
-  });
-
-  // You asked it should be displayed as CST
-  return `${s} CST`;
+  const d = new Date(localISO + "Z");
+  return (
+    d.toLocaleString("en-US", {
+      timeZone: DISPLAY_TZ_FIXED_CST,
+      year: "numeric",
+      month: "short",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true
+    }) + " CST"
+  );
 }
 
-// ADD — on-call window validation
-function validateOnCallWindow(startISO, endISO) {
-  const start = new Date(startISO);
-  const end = new Date(endISO);
+function isFriday(d) { return d.getDay() === 5; }
 
-  if (isNaN(start) || isNaN(end)) return "Invalid date/time format.";
-  if (start >= end) return "End must be after start.";
-
-  // Friday = 5
-  if (start.getDay() !== 5) return "Start must be on a Friday.";
-  if (end.getDay() !== 5) return "End must be on a Friday.";
-
-  if (start.getHours() !== 16 || start.getMinutes() !== 0)
-    return "Start time must be 4:00 PM CST.";
-
-  if (end.getHours() !== 7 || end.getMinutes() !== 0)
-    return "End time must be 7:00 AM CST.";
-
-  const diffDays = (end - start) / (1000 * 60 * 60 * 24);
-  if (diffDays < 6.9 || diffDays > 7.1)
-    return "On-call window must be exactly one week.";
-
-  return null;
-}
-// ADD — Friday helpers
-function isFriday(date) {
-  return date.getDay() === 5;
+function snapToFriday(d) {
+  const copy = new Date(d);
+  copy.setDate(copy.getDate() + ((5 - copy.getDay() + 7) % 7));
+  return copy;
 }
 
-function nearestFriday(date) {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = (5 - day + 7) % 7;
-  d.setDate(d.getDate() + diff);
-  return d;
-}
-
-function toLocalDateTimeInputValue(date) {
-  const pad = n => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+function toLocalInput(d) {
+  const p = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
 /* =========================
- * Public schedule
+ * Validation & Guards
  * ========================= */
 
-async function loadSchedulePublic(scheduleDiv) {
-  const dept = (APP_STATE.dept || "all").toLowerCase();
-  const res = await fetch(`${API_BASE}/oncall?department=${encodeURIComponent(dept)}`);
-  if (!res.ok) throw new Error(await res.text());
-  const data = await res.json();
-  APP_STATE.schedulePublic = data;
-  renderScheduleReadOnly(scheduleDiv, data.entries || []);
+function validateOnCallWindow(startISO, endISO) {
+  const s = new Date(startISO);
+  const e = new Date(endISO);
+  if (!isFriday(s) || !isFriday(e))
+    return "Start and end must be Fridays.";
+  if (s.getHours() !== 16 || e.getHours() !== 7)
+    return "Must be Fri 4:00 PM → Fri 7:00 AM CST.";
+  if ((e - s) / 86400000 !== 7)
+    return "On-call window must be exactly 7 days.";
+  return null;
 }
 
-function renderScheduleReadOnly(scheduleDiv, entries) {
-  scheduleDiv.innerHTML = "";
+function detectOverlaps(entries) {
+  const sorted = [...entries].sort(
+    (a,b) => new Date(a.startISO) - new Date(b.startISO)
+  );
+  for (let i=1;i<sorted.length;i++) {
+    if (new Date(sorted[i].startISO) < new Date(sorted[i-1].endISO)) {
+      return `Entry ${sorted[i].id} overlaps entry ${sorted[i-1].id}`;
+    }
+  }
+  return null;
+}
 
-  entries.forEach(entry => {
-    const card = document.createElement("div");
-    card.className = "schedule-card";
+function diffSchedules(original, draft) {
+  const diffs = [];
+  original.entries.forEach((o,i) => {
+    const d = draft.entries[i];
+    if (!d) return;
+    if (o.startISO !== d.startISO || o.endISO !== d.endISO)
+      diffs.push(`Entry ${o.id}: time changed`);
+    Object.keys(o.departments||{}).forEach(dep => {
+      ["name","email","phone"].forEach(f => {
+        if ((o.departments[dep][f]||"") !== (d.departments[dep][f]||""))
+          diffs.push(`Entry ${o.id} (${DEPT_LABELS[dep]}): ${f} changed`);
+      });
+    });
+  });
+  return diffs;
+}
 
-    const startDisplay = formatCSTFromDenverLocal(entry.startISO);
-    const endDisplay = formatCSTFromDenverLocal(entry.endISO);
-    const startInput = entry.startISO?.slice(0,16);
-    const endInput = entry.endISO?.slice(0,16);
+/* =========================
+ * Public Schedule (READ-ONLY)
+ * ========================= */
 
+async function loadSchedulePublic(el) {
+  const dept = APP_STATE.dept.toLowerCase();
+  const res = await fetch(`${API_BASE}/oncall?department=${dept}`);
+  const data = await res.json();
+  renderScheduleReadOnly(el, data.entries || []);
+}
 
-    card.innerHTML = `
-      <div class="card-head">
-        <div>
-          ${isEditing ? `
-  <div class="inline-row">
-    <label>Start</label>
-    <input type="datetime-local"
-           data-time-edit="start"
-           data-id="${entry.id}"
-           value="${startInput}" />
-  </div>
-  <div class="inline-row">
-    <label>End</label>
-    <input type="datetime-local"
-           data-time-edit="end"
-           data-id="${entry.id}"
-           value="${endInput}" />
-  </div>
-  <div class="small subtle">CST · Fri 4:00 PM → Fri 7:00 AM</div>
-` : `
-  <div class="card-title">${escapeHtml(startDisplay)} → ${escapeHtml(endDisplay)}</div>
-`}
-
-          <div class="small">Read-only · All departments</div>
+function renderScheduleReadOnly(el, entries) {
+  el.innerHTML = "";
+  entries.forEach(e => {
+    el.innerHTML += `
+      <div class="schedule-card">
+        <div class="card-title">
+          ${formatCSTFromDenverLocal(e.startISO)} →
+          ${formatCSTFromDenverLocal(e.endISO)}
         </div>
-      </div>
-      <div class="entry-grid">
-        ${renderDeptBlocks(entry.departments || {}, false, entry.id)}
-      </div>
-    `;
-    scheduleDiv.appendChild(card);
+        <div class="entry-grid">
+          ${renderDeptBlocks(e.departments,false,e.id)}
+        </div>
+      </div>`;
   });
 }
 
-function renderDeptBlocks(departments, editable, entryId) {
-  const keys = Object.keys(departments || {});
-  if (keys.length === 0) {
-    return `<div class="entry"><h4>—</h4><div class="small">No assignment</div></div>`;
-  }
+/* =========================
+ * Shared Dept Renderer
+ * ========================= */
 
-  return keys.map(k => {
-    const p = departments[k] || {};
-    const label = DEPT_LABELS[k] || k;
-
-    if (!editable) {
-      return `
+function renderDeptBlocks(depts, editable, entryId) {
+  return Object.keys(depts||{}).map(k => {
+    const p = depts[k];
+    return editable
+      ? `
         <div class="entry">
-          <h4>${escapeHtml(label)}</h4>
-          <div class="kv">
-            <div><b>${escapeHtml(p.name || "")}</b></div>
-            <div>${escapeHtml(p.email || "")}</div>
-            <div class="small">${escapeHtml(p.phone || "")}</div>
-          </div>
-        </div>
-      `;
-    }
-
-    // inline inputs: name/email/phone
-    return `
-      <div class="entry">
-        <h4>${escapeHtml(label)}</h4>
-        <div class="kv">
-          <div class="inline-row">
-            <label>Name</label>
-            <input data-entry="${escapeHtml(entryId)}" data-dept="${escapeHtml(k)}" data-field="name" value="${escapeHtml(p.name || "")}" />
-          </div>
-          <div class="inline-row">
-            <label>Email</label>
-            <input data-entry="${escapeHtml(entryId)}" data-dept="${escapeHtml(k)}" data-field="email" value="${escapeHtml(p.email || "")}" />
-          </div>
-          <div class="inline-row">
-            <label>Phone</label>
-            <input data-entry="${escapeHtml(entryId)}" data-dept="${escapeHtml(k)}" data-field="phone" value="${escapeHtml(p.phone || "")}" />
-          </div>
-        </div>
-      </div>
-    `;
+          <h4>${DEPT_LABELS[k]}</h4>
+          <input data-entry="${entryId}" data-dept="${k}" data-field="name" value="${escapeHtml(p.name||"")}"/>
+          <input data-entry="${entryId}" data-dept="${k}" data-field="email" value="${escapeHtml(p.email||"")}"/>
+          <input data-entry="${entryId}" data-dept="${k}" data-field="phone" value="${escapeHtml(p.phone||"")}"/>
+        </div>`
+      : `
+        <div class="entry">
+          <h4>${DEPT_LABELS[k]}</h4>
+          <b>${escapeHtml(p.name||"")}</b>
+          <div>${escapeHtml(p.email||"")}</div>
+          <div class="small">${escapeHtml(p.phone||"")}</div>
+        </div>`;
   }).join("");
 }
 
 /* =========================
- * Admin schedule (editable)
+ * Admin Schedule
  * ========================= */
 
-async function loadScheduleAdmin(scheduleDiv) {
+async function loadScheduleAdmin(el) {
   const res = await fetch(`${API_BASE}/admin/oncall`);
-  if (!res.ok) throw new Error(await res.text());
-  const schedule = await res.json();
-
-  APP_STATE.scheduleFull = schedule;
-  APP_STATE.draftSchedule = deepClone(schedule);
-  APP_STATE.editingEntryIds = new Set();
-
-  renderScheduleAdmin(scheduleDiv);
+  const data = await res.json();
+  APP_STATE.scheduleFull = data;
+  APP_STATE.draftSchedule = JSON.parse(JSON.stringify(data));
+  APP_STATE.editingEntryIds.clear();
+  renderScheduleAdmin(el);
 }
 
-function renderScheduleAdmin(scheduleDiv) {
-  const deptFilter = (APP_STATE.dept || "all").toLowerCase();
-  const schedule = APP_STATE.draftSchedule || { entries: [] };
-
-  scheduleDiv.innerHTML = "";
-
-  const entries = (schedule.entries || []).map(e => {
-    if (deptFilter === "all") return e;
-
-    // show entry but only include selected department in the display for clarity
-    const only = e.departments?.[deptFilter];
-    return {
-      ...e,
-      departments: only ? { [deptFilter]: only } : {}
-    };
-  });
-
-  entries.forEach(entry => {
-    const isEditing = APP_STATE.editingEntryIds.has(String(entry.id));
-    const card = document.createElement("div");
-    card.className = "schedule-card";
-
-    const startDisplay = formatCSTFromDenverLocal(entry.startISO);
-    const endDisplay = formatCSTFromDenverLocal(entry.endISO);
-    const startInput = entry.startISO?.slice(0,16);
-    const endInput = entry.endISO?.slice(0,16);
-
-
-    card.innerHTML = `
-      <div class="card-head">
-        <div>
-          ${isEditing ? `
-  <div class="inline-row">
-    <label>Start</label>
-    <input type="datetime-local"
-           data-time-edit="start"
-           data-id="${entry.id}"
-           value="${startInput}" />
-  </div>
-  <div class="inline-row">
-    <label>End</label>
-    <input type="datetime-local"
-           data-time-edit="end"
-           data-id="${entry.id}"
-           value="${endInput}" />
-  </div>
-  <div class="small subtle">CST · Fri 4:00 PM → Fri 7:00 AM</div>
-` : `
-  <div class="card-title">${escapeHtml(startDisplay)} → ${escapeHtml(endDisplay)}</div>
-`}
-
-          <div class="small">Entry ID: ${escapeHtml(String(entry.id))}</div>
-        </div>
-        <div class="card-actions">
-          <button class="ghost" data-action="notifyEntry" data-id="${escapeHtml(String(entry.id))}">Notify This Week</button>
-          ${isEditing
-            ? `<button class="primary" data-action="doneEdit" data-id="${escapeHtml(String(entry.id))}">Done</button>`
-            : `<button class="primary" data-action="edit" data-id="${escapeHtml(String(entry.id))}">Edit</button>`}
-        </div>
-      </div>
-
-      <div class="entry-grid">
-        ${renderDeptBlocks(entry.departments || {}, isEditing, entry.id)}
-      </div>
-    `;
-
-    scheduleDiv.appendChild(card);
-  });
-
-  // ADD — time editor wiring
-scheduleDiv.querySelectorAll("input[data-time-edit]").forEach(inp => {
-  inp.onchange = () => {
-    const id = inp.getAttribute("data-id");
-    const field = inp.getAttribute("data-time-edit");
-    const entry = APP_STATE.draftSchedule.entries.find(e => String(e.id) === String(id));
-    if (!entry) return;
-
-    let d = new Date(inp.value);
-
-    // Enforce Friday
-    if (!isFriday(d)) {
-      d = nearestFriday(d);
-    }
-
-    // Enforce fixed times
-    if (field === "start") {
-      d.setHours(16, 0, 0, 0); // Fri 4:00 PM
-      entry.startISO = toLocalDateTimeInputValue(d) + ":00";
-    }
-
-    if (field === "end") {
-      d.setHours(7, 0, 0, 0); // Fri 7:00 AM
-      entry.endISO = toLocalDateTimeInputValue(d) + ":00";
-    }
-
-    inp.value = toLocalDateTimeInputValue(d);
-  };
-});
-
-
-  // wire card actions and inline input listeners
-  scheduleDiv.querySelectorAll("button[data-action]").forEach(btn => {
-    btn.onclick = async () => {
-      const action = btn.getAttribute("data-action");
-      const id = btn.getAttribute("data-id");
-
-      if (action === "edit") {
-        APP_STATE.editingEntryIds.add(String(id));
-        renderScheduleAdmin(scheduleDiv);
-        return;
-      }
-
-      if (action === "doneEdit") {
-        APP_STATE.editingEntryIds.delete(String(id));
-        renderScheduleAdmin(scheduleDiv);
-        return;
-      }
-
-      if (action === "notifyEntry") {
-        confirmModal(
-          "Notify This Week",
-          "Send start and end notifications for this schedule entry to on-call engineers and admins?",
-          async () => {
-            await fetch(`${API_BASE}/admin/oncall/notify`, {
-              method: "POST",
-              headers: { "content-type": "application/json" },
-              body: JSON.stringify({ mode: "both", entryId: id })
-            });
-            toast("Notifications sent for entry.");
+function renderScheduleAdmin(el) {
+  el.innerHTML = "";
+  APP_STATE.draftSchedule.entries.forEach(e => {
+    const editing = APP_STATE.editingEntryIds.has(e.id);
+    el.innerHTML += `
+      <div class="schedule-card">
+        <div class="card-head">
+          ${
+            editing
+              ? `
+              <input type="datetime-local" value="${e.startISO.slice(0,16)}" data-time="start" data-id="${e.id}"/>
+              <input type="datetime-local" value="${e.endISO.slice(0,16)}" data-time="end" data-id="${e.id}"/>
+              <div class="small">Fri 4 PM → Fri 7 AM CST</div>`
+              : `<div class="card-title">
+                  ${formatCSTFromDenverLocal(e.startISO)} →
+                  ${formatCSTFromDenverLocal(e.endISO)}
+                </div>`
           }
-        );
-        return;
-      }
+          <button data-id="${e.id}" class="primary">${editing?"Done":"Edit"}</button>
+        </div>
+        <div class="entry-grid">
+          ${renderDeptBlocks(e.departments,editing,e.id)}
+        </div>
+      </div>`;
+  });
+
+  el.querySelectorAll("button[data-id]").forEach(b=>{
+    b.onclick=()=>{
+      APP_STATE.editingEntryIds.has(b.dataset.id)
+        ? APP_STATE.editingEntryIds.delete(b.dataset.id)
+        : APP_STATE.editingEntryIds.add(b.dataset.id);
+      renderScheduleAdmin(el);
     };
   });
 
-  scheduleDiv.querySelectorAll("input[data-entry]").forEach(inp => {
-    inp.oninput = () => {
-      const entryId = inp.getAttribute("data-entry");
-      const dept = inp.getAttribute("data-dept");
-      const field = inp.getAttribute("data-field");
-      const value = inp.value;
-
-      // find the real entry in draftSchedule (not filtered copy)
-      const real = (APP_STATE.draftSchedule.entries || []).find(e => String(e.id) === String(entryId));
-      if (!real) return;
-
-      if (!real.departments) real.departments = {};
-      if (!real.departments[dept]) real.departments[dept] = {};
-      real.departments[dept][field] = value;
+  el.querySelectorAll("input[data-time]").forEach(inp=>{
+    inp.onchange=()=>{
+      const entry=APP_STATE.draftSchedule.entries.find(e=>String(e.id)===inp.dataset.id);
+      let d=new Date(inp.value);
+      if(!isFriday(d)) d=snapToFriday(d);
+      if(inp.dataset.time==="start") d.setHours(16,0,0,0);
+      else d.setHours(7,0,0,0);
+      entry[inp.dataset.time+"ISO"]=toLocalInput(d)+":00";
+      inp.value=toLocalInput(d);
     };
   });
-}
 
-function deepClone(obj) {
-  return JSON.parse(JSON.stringify(obj));
-}
-
-// ADD — overlap detection
-function detectOverlaps(entries) {
-  const sorted = [...entries].sort(
-    (a, b) => new Date(a.startISO) - new Date(b.startISO)
-  );
-
-  const overlaps = [];
-
-  for (let i = 1; i < sorted.length; i++) {
-    const prev = sorted[i - 1];
-    const curr = sorted[i];
-
-    const prevEnd = new Date(prev.endISO);
-    const currStart = new Date(curr.startISO);
-
-    if (currStart < prevEnd) {
-      overlaps.push({
-        prevId: prev.id,
-        currId: curr.id,
-        message: `Entry ${curr.id} overlaps with entry ${prev.id}`
-      });
-    }
-  }
-
-  return overlaps;
+  el.querySelectorAll("input[data-entry]").forEach(inp=>{
+    inp.oninput=()=>{
+      const e=APP_STATE.draftSchedule.entries.find(x=>String(x.id)===inp.dataset.entry);
+      e.departments[inp.dataset.dept][inp.dataset.field]=inp.value;
+    };
+  });
 }
 
 /* =========================
- * Admin actions
+ * Save / Notify / Export
  * ========================= */
 
 async function saveAllChanges() {
-  const original = APP_STATE.scheduleFull;
-  const draft = APP_STATE.draftSchedule;
+  const overlapErr = detectOverlaps(APP_STATE.draftSchedule.entries);
+  if (overlapErr) return toast(overlapErr);
 
-  const diffs = diffSchedules(original, draft);
-  if (diffs.length === 0) {
-    toast("No changes detected.");
-    return;
-  }
-
-  for (const e of draft.entries) {
+  for (const e of APP_STATE.draftSchedule.entries) {
     const err = validateOnCallWindow(e.startISO, e.endISO);
-    if (err) throw new Error(`Entry ${e.id}: ${err}`);
+    if (err) return toast(`Entry ${e.id}: ${err}`);
   }
 
-  confirmModal(
-    "Confirm Schedule Changes",
-    `
-      <b>${diffs.length} change(s):</b>
-      <ul>${diffs.map(d => `<li>${escapeHtml(d)}</li>`).join("")}</ul>
-      <p>This will overwrite the current schedule.</p>
-    `,
-    async () => {
-      const res = await fetch(`${API_BASE}/admin/oncall/save`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ schedule: draft })
+  const diffs = diffSchedules(APP_STATE.scheduleFull, APP_STATE.draftSchedule);
+  if (!diffs.length) return toast("No changes detected.");
+
+  confirmModal("Confirm Save",
+    `<ul>${diffs.map(d=>`<li>${escapeHtml(d)}</li>`).join("")}</ul>`,
+    async()=>{
+      await fetch(`${API_BASE}/admin/oncall/save`,{
+        method:"POST",
+        headers:{"content-type":"application/json"},
+        body:JSON.stringify({schedule:APP_STATE.draftSchedule})
       });
-
-      if (!res.ok) throw new Error(await res.text());
       toast("Schedule saved.");
-      await loadScheduleAdmin(byId("schedule"));
+      loadScheduleAdmin(byId("schedule"));
     }
-    const overlaps = detectOverlaps(draft.entries);
-if (overlaps.length > 0) {
-  throw new Error(
-    overlaps.map(o => o.message).join("; ")
-  );
-}
-
   );
 }
 
 async function exportExcelAdmin() {
-  const dept = byId("deptFilter").value;
-  window.location = `${API_BASE}/admin/oncall/export?department=${encodeURIComponent(dept)}`;
+  window.location = `${API_BASE}/admin/oncall/export?department=${APP_STATE.dept}`;
 }
 
 async function sendNotify() {
-  const res = await fetch(`${API_BASE}/admin/oncall/notify`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ mode: "both" })
+  await fetch(`${API_BASE}/admin/oncall/notify`,{
+    method:"POST",
+    headers:{"content-type":"application/json"},
+    body:JSON.stringify({mode:"both"})
   });
-  if (!res.ok) throw new Error(await res.text());
   toast("Notifications sent.");
 }
 
 async function revertSchedule() {
-  const res = await fetch(`${API_BASE}/admin/oncall/revert`, { method: "POST" });
-  if (!res.ok) throw new Error(await res.text());
-  toast("Reverted. Reloading...");
-  await loadScheduleAdmin(byId("schedule"));
+  await fetch(`${API_BASE}/admin/oncall/revert`,{method:"POST"});
+  toast("Reverted.");
+  loadScheduleAdmin(byId("schedule"));
 }
 
-async function runAutogen() {
-  const start = byId("autogenStart").value;
-  const end = byId("autogenEnd").value;
-  const seed = Number(byId("autogenSeed").value || 0);
-
-  if (!start || !end) throw new Error("Start and end dates are required.");
-
-  const res = await fetch(`${API_BASE}/admin/oncall/autogenerate`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ startYMD: start, endYMD: end, seedIndex: seed })
-  });
-
-  if (!res.ok) throw new Error(await res.text());
-  toast("Auto-generated schedule.");
-  await loadScheduleAdmin(byId("schedule"));
-}
-// ADD — schedule diff helper
-function diffSchedules(original, draft) {
-  const diffs = [];
-
-  original.entries.forEach((o, i) => {
-    const d = draft.entries[i];
-    if (!d) return;
-
-    if (o.startISO !== d.startISO || o.endISO !== d.endISO) {
-      diffs.push(`Entry ${o.id}: on-call window changed`);
-    }
-
-    for (const dept of Object.keys(o.departments || {})) {
-      const op = o.departments[dept] || {};
-      const dp = d.departments[dept] || {};
-
-      ["name", "email", "phone"].forEach(f => {
-        if ((op[f] || "") !== (dp[f] || "")) {
-          diffs.push(`Entry ${o.id} (${DEPT_LABELS[dept]}): ${f} changed`);
-        }
-      });
-    }
-  });
-
-  return diffs;
-}
 /* =========================
- * Roster management UI
+ * Roster Management
  * ========================= */
 
-let ROSTER_STATE = null;
+let ROSTER_STATE=null;
 
 async function loadRoster() {
-  const res = await fetch(`${API_BASE}/admin/roster`);
-  if (!res.ok) throw new Error(await res.text());
-  const roster = await res.json();
-  ROSTER_STATE = roster;
-
+  const res=await fetch(`${API_BASE}/admin/roster`);
+  ROSTER_STATE=await res.json();
   renderRoster();
 }
 
 function renderRoster() {
-  const wrap = byId("roster");
-  if (!wrap) return;
-
-  wrap.innerHTML = `
-    <div class="roster-wrap">
-      ${DEPT_KEYS.map(k => renderRosterDept(k)).join("")}
-    </div>
-  `;
-
-  // wire remove buttons and inline inputs
-  wrap.querySelectorAll("button[data-roster-remove]").forEach(btn => {
-    btn.onclick = () => {
-      const dept = btn.getAttribute("data-dept");
-      const idx = Number(btn.getAttribute("data-idx"));
-      if (!confirm(`Remove this user from ${DEPT_LABELS[dept]} roster?`)) return;
-      ROSTER_STATE[dept].splice(idx, 1);
-      renderRoster();
-    };
-  });
-
-  wrap.querySelectorAll("input[data-roster]").forEach(inp => {
-    inp.oninput = () => {
-      const dept = inp.getAttribute("data-dept");
-      const idx = Number(inp.getAttribute("data-idx"));
-      const field = inp.getAttribute("data-field");
-      ROSTER_STATE[dept][idx][field] = inp.value;
-    };
-  });
+  const el=byId("roster");
+  if(!el) return;
+  el.innerHTML=DEPT_KEYS.map(k=>renderRosterDept(k)).join("");
 }
 
-function renderRosterDept(deptKey) {
-  const label = DEPT_LABELS[deptKey];
-  const list = (ROSTER_STATE && Array.isArray(ROSTER_STATE[deptKey])) ? ROSTER_STATE[deptKey] : [];
-
+function renderRosterDept(k) {
   return `
     <div class="roster-card">
-      <h3>${escapeHtml(label)}</h3>
-      <table class="roster-table">
-        <thead>
-          <tr>
-            <th style="width:30%">Name</th>
-            <th style="width:40%">Email</th>
-            <th style="width:20%">Phone</th>
-            <th style="width:10%"></th>
-          </tr>
-        </thead>
-        <tbody>
-          ${list.map((u, idx) => `
-            <tr>
-              <td>
-                <input data-roster="1" data-dept="${escapeHtml(deptKey)}" data-idx="${idx}" data-field="name" value="${escapeHtml(u.name || "")}" />
-              </td>
-              <td>
-                <input data-roster="1" data-dept="${escapeHtml(deptKey)}" data-idx="${idx}" data-field="email" value="${escapeHtml(u.email || "")}" />
-              </td>
-              <td>
-                <input data-roster="1" data-dept="${escapeHtml(deptKey)}" data-idx="${idx}" data-field="phone" value="${escapeHtml(u.phone || "")}" />
-              </td>
-              <td>
-                <button class="iconbtn" data-roster-remove="1" data-dept="${escapeHtml(deptKey)}" data-idx="${idx}" title="Remove">🗑</button>
-              </td>
-            </tr>
-          `).join("")}
-        </tbody>
-      </table>
-      <div class="small subtle" style="margin-top:8px">
-        Rotation uses this list order.
-      </div>
-    </div>
-  `;
+      <h3>${DEPT_LABELS[k]}</h3>
+      ${(ROSTER_STATE[k]||[]).map((u,i)=>`
+        <input data-rdept="${k}" data-idx="${i}" data-field="name" value="${escapeHtml(u.name||"")}"/>
+        <input data-rdept="${k}" data-idx="${i}" data-field="email" value="${escapeHtml(u.email||"")}"/>
+        <input data-rdept="${k}" data-idx="${i}" data-field="phone" value="${escapeHtml(u.phone||"")}"/>
+      `).join("")}
+    </div>`;
 }
 
 function rosterAddUserPrompt() {
-  byId("modalTitle").textContent = "Add Roster User";
-  byId("modalBody").innerHTML = `
-    <div class="form-grid">
-      <div class="field">
-        <label>Department</label>
-        <select id="newUserDept">
-          <option value="enterprise_network">Enterprise Network</option>
-          <option value="collaboration">Collaboration</option>
-          <option value="system_storage">System & Storage</option>
-        </select>
-      </div>
-      <div class="field">
-        <label>Name</label>
-        <input id="newUserName" />
-      </div>
-      <div class="field">
-        <label>Email</label>
-        <input id="newUserEmail" />
-      </div>
-      <div class="field">
-        <label>Phone</label>
-        <input id="newUserPhone" />
-      </div>
-    </div>
-  `;
-
-  byId("modalOk").onclick = () => {
-    const dept = byId("newUserDept").value;
-    const name = byId("newUserName").value.trim();
-    const email = byId("newUserEmail").value.trim();
-    const phone = byId("newUserPhone").value.trim();
-
-    if (!name || !email) {
-      toast("Name and email are required.");
-      return;
+  confirmModal("Add User",
+    `<input id="nuName" placeholder="Name"/>
+     <input id="nuEmail" placeholder="Email"/>
+     <select id="nuDept">${DEPT_KEYS.map(k=>`<option value="${k}">${DEPT_LABELS[k]}</option>`)}</select>`,
+    ()=>{
+      const k=byId("nuDept").value;
+      ROSTER_STATE[k].push({name:byId("nuName").value,email:byId("nuEmail").value});
+      renderRoster();
     }
-
-    ROSTER_STATE[dept].push({ name, email, phone });
-    hideModal();
-    renderRoster();
-    toast("User added to roster (not saved yet).");
-  };
-
-  byId("modal").classList.remove("hidden");
+  );
 }
 
 async function saveRoster() {
-  if (!ROSTER_STATE) throw new Error("Roster is empty.");
-
-  const res = await fetch(`${API_BASE}/admin/roster/save`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ roster: ROSTER_STATE })
+  await fetch(`${API_BASE}/admin/roster/save`,{
+    method:"POST",
+    headers:{"content-type":"application/json"},
+    body:JSON.stringify({roster:ROSTER_STATE})
   });
-
-  if (!res.ok) throw new Error(await res.text());
   toast("Roster saved.");
-  await loadRoster();
 }
 
 /* =========================
- * Audit log viewer
+ * Audit Log
  * ========================= */
 
 async function loadAudit() {
-  const el = byId("audit");
-  if (!el) return;
-
-  el.innerHTML = `<div class="subtle">Loading audit log…</div>`;
-
-  const res = await fetch(`${API_BASE}/admin/audit`);
-  if (!res.ok) {
-    el.innerHTML = `<div class="subtle">Unable to load audit log.</div>`;
-    return;
-  }
-
-  const data = await res.json();
-  const items = data.entries || [];
-
-  if (items.length === 0) {
-    el.innerHTML = `<div class="subtle">No audit entries yet.</div>`;
-    return;
-  }
-
-  el.innerHTML = items.map(a => {
-    const ts = a.ts ? new Date(a.ts).toLocaleString("en-US") : "";
-    return `
-      <div class="audit-item">
-        <div class="audit-top">
-          <div><span class="badge">${escapeHtml(a.action || "")}</span></div>
-          <div class="small">${escapeHtml(ts)}</div>
-        </div>
-        <div><b>${escapeHtml(a.actor || "")}</b></div>
-        <div class="small">${escapeHtml(a.note || "")}</div>
-      </div>
-    `;
-  }).join("");
+  const el=byId("audit");
+  if(!el) return;
+  const res=await fetch(`${API_BASE}/admin/audit`);
+  const data=await res.json();
+  el.innerHTML=(data.entries||[]).map(a=>`
+    <div class="audit-item">
+      <span class="badge">${escapeHtml(a.action||"")}</span>
+      <div>${escapeHtml(a.actor||"")}</div>
+      <div class="small">${escapeHtml(a.note||"")}</div>
+    </div>`).join("");
 }
