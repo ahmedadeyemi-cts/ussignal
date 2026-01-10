@@ -32,11 +32,11 @@ const DEPT_KEYS = Object.keys(DEPT_LABELS);
 /* =========================
  * Timezone Handling
  * =========================
- * Worker stores ISO wall time intended as America/Denver.
+ * Worker stores ISO wall time intended as America/Chicago.
  * UI displays in fixed CST (UTC-6) year-round and labels "CST".
  * NOTE: Using fixed UTC-6 means this does NOT become CDT in summer (per your requirement).
  */
-const SOURCE_TZ = "America/Denver";
+const SOURCE_TZ = "America/Chicago";
 const DISPLAY_TZ_FIXED_CST = "Etc/GMT+6";
 
 /* =========================
