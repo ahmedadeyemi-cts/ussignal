@@ -1,3 +1,4 @@
+<!-- admin.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -17,25 +18,115 @@
         <option value="collaboration">Collaboration</option>
         <option value="system_storage">System & Storage</option>
       </select>
-      <button id="themeToggle">☀ / 🌙</button>
+      <button id="themeToggle" title="Toggle theme">☀ / 🌙</button>
     </div>
   </header>
 
   <main class="container">
     <h1>On-Call Administration (CST)</h1>
+    <p class="subtle">
+      Admin actions require Access authentication. Displayed in <b>Central Standard Time (CST)</b>.
+    </p>
 
-    <div class="admin-bar">
-      <button id="exportBtn">Export to Excel</button>
-      <button id="notifyBtn">Send Notifications</button>
-      <button id="revertBtn" class="warn">Revert Last Change</button>
-    </div>
+    <nav class="tabs" role="tablist" aria-label="Admin sections">
+      <button class="tab active" data-tab="scheduleTab" role="tab" aria-selected="true">Schedule</button>
+      <button class="tab" data-tab="rosterTab" role="tab">Roster</button>
+      <button class="tab" data-tab="autogenTab" role="tab">Auto-Generate</button>
+      <button class="tab" data-tab="auditTab" role="tab">Audit Log</button>
+    </nav>
 
-    <div id="schedule"></div>
+    <!-- SCHEDULE TAB -->
+    <section id="scheduleTab" class="panel active" role="tabpanel">
+      <div class="admin-bar">
+        <button id="saveAllBtn" class="primary">Save All Changes</button>
+        <button id="exportBtn">Export to Excel</button>
+        <button id="notifyBtn">Send Notifications</button>
+        <button id="revertBtn" class="warn">Revert Last Change</button>
+      </div>
+
+      <div class="hint">
+        Tip: click <b>Edit</b> on a week to change names/emails/phones. Then click <b>Save All Changes</b>.
+      </div>
+
+      <div id="schedule"></div>
+    </section>
+
+    <!-- ROSTER TAB -->
+    <section id="rosterTab" class="panel" role="tabpanel">
+      <div class="admin-bar">
+        <button id="rosterAddUserBtn" class="primary">Add User</button>
+        <button id="rosterSaveBtn">Save Roster</button>
+        <button id="rosterReloadBtn" class="ghost">Reload</button>
+      </div>
+
+      <p class="subtle">
+        Roster drives auto-generation rotation. Add/remove users per department.
+      </p>
+
+      <div id="roster"></div>
+    </section>
+
+    <!-- AUTOGEN TAB -->
+    <section id="autogenTab" class="panel" role="tabpanel">
+      <div class="admin-bar">
+        <button id="runAutogenBtn" class="primary">Auto-Generate Schedule</button>
+      </div>
+
+      <div class="form-grid">
+        <div class="field">
+          <label for="autogenStart">Start Date (YYYY-MM-DD)</label>
+          <input id="autogenStart" type="date" />
+          <div class="help">First Friday on/after this date will be used.</div>
+        </div>
+
+        <div class="field">
+          <label for="autogenEnd">End Date (YYYY-MM-DD)</label>
+          <input id="autogenEnd" type="date" />
+          <div class="help">Generates weekly windows up to this range.</div>
+        </div>
+
+        <div class="field">
+          <label for="autogenSeed">Seed Index</label>
+          <input id="autogenSeed" type="number" value="0" min="0" step="1" />
+          <div class="help">Changes who starts the rotation (0 = first person).</div>
+        </div>
+      </div>
+
+      <div class="hint">
+        Windows are fixed as: <b>Friday 4:00 PM → next Friday 7:00 AM</b>.
+      </div>
+    </section>
+
+    <!-- AUDIT TAB -->
+    <section id="auditTab" class="panel" role="tabpanel">
+      <div class="admin-bar">
+        <button id="auditRefreshBtn" class="primary">Refresh Audit Log</button>
+      </div>
+
+      <div id="audit"></div>
+    </section>
   </main>
 
   <footer class="footer">
     Admin access required · All actions are audited
   </footer>
+
+  <!-- Modal -->
+  <div id="modal" class="modal hidden" aria-hidden="true">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-head">
+        <div id="modalTitle" class="modal-title">Confirm</div>
+        <button id="modalClose" class="iconbtn" aria-label="Close">✕</button>
+      </div>
+      <div id="modalBody" class="modal-body"></div>
+      <div class="modal-actions">
+        <button id="modalCancel" class="ghost">Cancel</button>
+        <button id="modalOk" class="primary">Proceed</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
 
   <script src="app.js"></script>
   <script>
