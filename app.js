@@ -15,7 +15,8 @@
 
 "use strict";
 
-const API_BASE = "https://ussignal.ahmedadeyemi.workers.dev/";
+// Cloudflare Worker Path
+const API_BASE = "https://ussignal.ahmedadeyemi.workers.dev";
 
 /* =========================
  * Departments
