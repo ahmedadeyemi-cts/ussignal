@@ -256,6 +256,30 @@ function formatCSTFromDenverLocal(localISO) {
   return `${s} CST`;
 }
 
+// ADD — on-call window validation
+function validateOnCallWindow(startISO, endISO) {
+  const start = new Date(startISO);
+  const end = new Date(endISO);
+
+  if (isNaN(start) || isNaN(end)) return "Invalid date/time format.";
+  if (start >= end) return "End must be after start.";
+
+  // Friday = 5
+  if (start.getDay() !== 5) return "Start must be on a Friday.";
+  if (end.getDay() !== 5) return "End must be on a Friday.";
+
+  if (start.getHours() !== 16 || start.getMinutes() !== 0)
+    return "Start time must be 4:00 PM CST.";
+
+  if (end.getHours() !== 7 || end.getMinutes() !== 0)
+    return "End time must be 7:00 AM CST.";
+
+  const diffDays = (end - start) / (1000 * 60 * 60 * 24);
+  if (diffDays < 6.9 || diffDays > 7.1)
+    return "On-call window must be exactly one week.";
+
+  return null;
+}
 /* =========================
  * Public schedule
  * ========================= */
@@ -276,8 +300,11 @@ function renderScheduleReadOnly(scheduleDiv, entries) {
     const card = document.createElement("div");
     card.className = "schedule-card";
 
-    const start = formatCSTFromDenverLocal(entry.startISO);
-    const end = formatCSTFromDenverLocal(entry.endISO);
+    const startDisplay = formatCSTFromDenverLocal(entry.startISO);
+    const endDisplay = formatCSTFromDenverLocal(entry.endISO);
+    const startInput = entry.startISO?.slice(0,16);
+    const endInput = entry.endISO?.slice(0,16);
+
 
     card.innerHTML = `
       <div class="card-head">
@@ -378,8 +405,11 @@ function renderScheduleAdmin(scheduleDiv) {
     const card = document.createElement("div");
     card.className = "schedule-card";
 
-    const start = formatCSTFromDenverLocal(entry.startISO);
-    const end = formatCSTFromDenverLocal(entry.endISO);
+    const startDisplay = formatCSTFromDenverLocal(entry.startISO);
+    const endDisplay = formatCSTFromDenverLocal(entry.endISO);
+    const startInput = entry.startISO?.slice(0,16);
+    const endInput = entry.endISO?.slice(0,16);
+
 
     card.innerHTML = `
       <div class="card-head">
