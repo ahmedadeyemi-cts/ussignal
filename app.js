@@ -116,12 +116,16 @@ async function fetchPublic(path, opts = {}) {
  * ========================= */
 
 async function initApp(ctx = {}) {
-// NEW — Cloudflare Access = Admin
-APP_STATE.isAuthenticated = true;
-APP_STATE.admin = true;
-APP_STATE.role = "admin";
-APP_STATE.email = ctx.email || "";
-APP_STATE.allowedDepartments = DEPT_KEYS.slice(); // full access
+// =========================
+// AUTH FROM CLOUDFLARE ACCESS
+// =========================
+APP_STATE.isAuthenticated = Boolean(ctx && ctx.email);
+APP_STATE.admin = Boolean(ctx && ctx.admin === true);
+APP_STATE.role = ctx?.role || (APP_STATE.admin ? "admin" : "viewer");
+APP_STATE.email = ctx?.email || "";
+APP_STATE.allowedDepartments = Array.isArray(ctx?.departments)
+  ? ctx.departments
+  : DEPT_KEYS.slice(); // fallback
    // =========================
   // Role Badge
   // =========================
@@ -195,25 +199,24 @@ APP_STATE.allowedDepartments = DEPT_KEYS.slice(); // full access
   // =========================
   const scheduleEl = byId("schedule");
 
-  if (scheduleEl) {
-    if (APP_STATE.admin || roleAtLeast(APP_STATE.role, "editor")) {
-      try {
-        await loadScheduleAdmin(scheduleEl);
-      } catch (e) {
-        console.error("Schedule admin load failed:", e);
-        toast("Unable to load admin schedule. Access may be misconfigured.", 5000);
-      }
-    } else {
-      try {
-        await loadSchedulePublic(scheduleEl);
-      } catch (e) {
-        console.error("Public schedule load failed:", e);
-        toast("Unable to load schedule.", 5000);
-      }
+ if (scheduleEl) {
+  if (APP_STATE.isAuthenticated && APP_STATE.admin) {
+    try {
+      await loadScheduleAdmin(scheduleEl);
+    } catch (e) {
+      console.error("Schedule admin load failed:", e);
+      toast("Admin access denied by Cloudflare.", 5000);
+    }
+  } else {
+    try {
+      await loadSchedulePublic(scheduleEl);
+    } catch (e) {
+      console.error("Public schedule load failed:", e);
+      toast("Unable to load public schedule.", 5000);
     }
   }
-
-  if (roleAtLeast(APP_STATE.role, "admin") && byId("roster")) {
+}
+  if (APP_STATE.isAuthenticated && APP_STATE.admin && byId("roster")) {
     try {
       await loadRoster();
     } catch (e) {
