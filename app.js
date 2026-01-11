@@ -111,7 +111,7 @@ async function fetchPublic(path, opts = {}) {
  * Init
  * ========================= */
 
-function initApp(ctx = {}) {
+async function initApp(ctx = {}) {
   APP_STATE.admin = !!ctx.admin;
   APP_STATE.isAuthenticated = !!ctx.admin;
   APP_STATE.role = ctx.role || (APP_STATE.admin ? "admin" : "viewer");
@@ -125,7 +125,7 @@ function initApp(ctx = {}) {
   if (filter) {
     filter.onchange = () => {
       APP_STATE.dept = filter.value || "all";
-      refreshMainView();
+      reloadSchedule();
     };
   }
 
@@ -165,23 +165,40 @@ function initApp(ctx = {}) {
 
   onClick("auditRefreshBtn", loadAudit);
 
-  applyRBACToUI();
+ applyRBACToUI();
 
-  refreshMainView();
-
-  if (roleAtLeast(APP_STATE.role, "admin")) {
-    if (byId("roster")) loadRoster().catch(e => toast(e.message || String(e), 4000));
+/**
+ * 🔑 CRITICAL FIX:
+ * Always load the admin schedule first so roster + autogen
+ * have a valid schedule context.
+ */
+if (APP_STATE.admin || roleAtLeast(APP_STATE.role, "editor")) {
+  const scheduleEl = byId("schedule");
+  if (scheduleEl) {
+    await loadScheduleAdmin(scheduleEl);
+  }
+} else {
+  const scheduleEl = byId("schedule");
+  if (scheduleEl) {
+    await loadSchedulePublic(scheduleEl);
   }
 }
 
-function refreshMainView() {
+// Now it is safe to load roster
+if (roleAtLeast(APP_STATE.role, "admin")) {
+  if (byId("roster")) {
+    await loadRoster();
+  }
+}
+
+async function reloadSchedule() {
   const scheduleDiv = byId("schedule");
   if (!scheduleDiv) return;
 
   if (APP_STATE.admin || roleAtLeast(APP_STATE.role, "editor")) {
-    loadScheduleAdmin(scheduleDiv).catch(e => toast(e.message || String(e), 4000));
+    await loadScheduleAdmin(scheduleDiv);
   } else {
-    loadSchedulePublic(scheduleDiv).catch(e => toast(e.message || String(e), 4000));
+    await loadSchedulePublic(scheduleDiv);
   }
 }
 
@@ -387,7 +404,7 @@ function zonedWallTimeToUtcMs(localISO, timeZone) {
   return guessMs;
 }
 
-function formatCSTFromDenverLocal(localISO) {
+function formatCSTFromChicagoLocal(localISO) {
   const utcMs = zonedWallTimeToUtcMs(localISO, SOURCE_TZ);
   if (utcMs === null) return "";
   const d = new Date(utcMs);
