@@ -1,9 +1,14 @@
 export async function onRequest({ request, params }) {
-  const target = new URL(
-    `https://api.onenecklab.com/${params.path || ""}`
-  );
+  const url = new URL(request.url);
 
-  return fetch(target.toString(), {
+  // Join path segments safely
+  const path = Array.isArray(params.path)
+    ? params.path.join("/")
+    : "";
+
+  const targetUrl = `https://api.onenecklab.com/${path}${url.search}`;
+
+  return fetch(targetUrl, {
     method: request.method,
     headers: request.headers,
     body:
