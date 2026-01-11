@@ -5,6 +5,13 @@ export async function onRequestPost({ request, env }) {
     return new Response("Unauthorized", { status: 401 });
   }
 
+  if (!env.ONCALL_KV) {
+    return new Response(
+      JSON.stringify({ error: "KV binding ONCALL_KV not configured" }),
+      { status: 500, headers: { "content-type": "application/json" } }
+    );
+  }
+
   let body;
   try {
     body = await request.json();
@@ -16,7 +23,6 @@ export async function onRequestPost({ request, env }) {
     return new Response("Invalid roster payload", { status: 400 });
   }
 
-  // ✅ ACTUAL PERSISTENCE
   await env.ONCALL_KV.put("roster", JSON.stringify(body.roster));
 
   return new Response(
