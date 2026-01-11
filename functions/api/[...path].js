@@ -1,4 +1,4 @@
-export async function onRequest(context) {
+export async function onRequest({ request, params, env }) {
   const { request, params } = context;
   const path = params.path || "";
   const method = request.method;
