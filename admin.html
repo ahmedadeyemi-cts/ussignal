@@ -2,16 +2,21 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>US Signal | On-Call Admin</title>
+  <title>US Signal | On-Call Administration</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <!-- ✅ Favicon (fixes 404) -->
+  <!-- Favicon -->
   <link rel="icon" href="./ussignal.jpg" type="image/jpeg" />
 
+  <!-- Core Styles -->
   <link rel="stylesheet" href="style.css" />
 </head>
+
 <body class="light">
 
+<!-- =========================
+     TOP BAR
+========================= -->
 <header class="topbar">
   <div class="brand">
     <img src="ussignal.jpg" alt="US Signal" class="logo" />
@@ -21,8 +26,9 @@
     </div>
   </div>
 
+  <!-- Controls MUST exist for app.js -->
   <div class="controls">
-    <select id="deptFilter">
+    <select id="deptFilter" aria-label="Department Filter">
       <option value="all">All Departments</option>
       <option value="enterprise_network">Enterprise Network</option>
       <option value="collaboration">Collaboration</option>
@@ -37,26 +43,35 @@
   </div>
 </header>
 
-<nav class="tabs">
-  <button class="tab active" data-tab="scheduleTab">Schedule</button>
-  <button class="tab" data-tab="timelineTab">Timeline</button>
-  <button class="tab" data-tab="rosterTab">Roster</button>
-  <button class="tab" data-tab="autogenTab">Auto-Generate</button>
-  <button class="tab" data-tab="auditTab">Audit</button>
+<!-- =========================
+     TABS (wireTabs depends on this)
+========================= -->
+<nav class="tabs" role="tablist">
+  <button class="tab active" data-tab="scheduleTab" role="tab">Schedule</button>
+  <button class="tab" data-tab="timelineTab" role="tab">Timeline</button>
+  <button class="tab" data-tab="rosterTab" role="tab">Roster</button>
+  <button class="tab" data-tab="autogenTab" role="tab">Auto-Generate</button>
+  <button class="tab" data-tab="auditTab" role="tab">Audit</button>
 </nav>
 
+<!-- =========================
+     MAIN CONTENT
+========================= -->
 <main class="container">
 
-  <section id="scheduleTab" class="panel active">
+  <!-- Schedule -->
+  <section id="scheduleTab" class="panel active" role="tabpanel">
     <div id="schedule"></div>
   </section>
 
-  <section id="timelineTab" class="panel">
+  <!-- Timeline -->
+  <section id="timelineTab" class="panel" role="tabpanel">
     <h2>Weekly Timeline</h2>
     <div id="timeline"></div>
   </section>
 
-  <section id="rosterTab" class="panel">
+  <!-- Roster -->
+  <section id="rosterTab" class="panel" role="tabpanel">
     <div class="panel-head">
       <h2>Roster Management</h2>
       <div>
@@ -68,20 +83,25 @@
     <div id="roster"></div>
   </section>
 
-  <section id="autogenTab" class="panel">
+  <!-- Auto-Generate -->
+  <section id="autogenTab" class="panel" role="tabpanel">
     <h2>Auto-Generate Schedule</h2>
     <div class="form-row">
-      <label>Start</label>
+      <label for="autogenStart">Start</label>
       <input type="date" id="autogenStart" />
-      <label>End</label>
+
+      <label for="autogenEnd">End</label>
       <input type="date" id="autogenEnd" />
-      <label>Seed</label>
+
+      <label for="autogenSeed">Seed</label>
       <input type="number" id="autogenSeed" value="0" />
+
       <button id="runAutogenBtn" class="primary">Run</button>
     </div>
   </section>
 
-  <section id="auditTab" class="panel">
+  <!-- Audit -->
+  <section id="auditTab" class="panel" role="tabpanel">
     <div class="panel-head">
       <h2>Audit Log</h2>
       <button id="auditRefreshBtn" class="ghost">Refresh</button>
@@ -91,12 +111,14 @@
 
 </main>
 
-<!-- Modal -->
-<div id="modal" class="modal hidden">
+<!-- =========================
+     MODAL (required)
+========================= -->
+<div id="modal" class="modal hidden" aria-hidden="true">
   <div class="modal-card">
     <div class="modal-head">
       <h3 id="modalTitle"></h3>
-      <button id="modalClose">✕</button>
+      <button id="modalClose" aria-label="Close">✕</button>
     </div>
     <div id="modalBody" class="modal-body"></div>
     <div class="modal-actions">
@@ -106,12 +128,21 @@
   </div>
 </div>
 
-<div id="toast" class="toast hidden"></div>
+<!-- Toast -->
+<div id="toast" class="toast hidden" role="status"></div>
 
+<!-- =========================
+     APP SCRIPT
+========================= -->
 <script src="/app.js" defer></script>
 <script>
+  // Cloudflare Access injects context into window.__CTX__
   window.addEventListener("DOMContentLoaded", () => {
-    initApp(window.__CTX__ || {});
+    if (typeof initApp === "function") {
+      initApp(window.__CTX__ || {});
+    } else {
+      console.error("initApp() not found — app.js failed to load.");
+    }
   });
 </script>
 
