@@ -295,3 +295,27 @@ button {
   background: #9ca3af;
   color: white;
 }
+body.light {
+  --bg: #f9fafb;
+  --panel: #ffffff;
+  --text: #111827;
+  --subtle: #6b7280;
+}
+
+body.dark {
+  --bg: #0b1220;
+  --panel: #111827;
+  --text: #e5e7eb;
+  --subtle: #9ca3af;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.schedule-card,
+.panel,
+.modal-card {
+  background: var(--panel);
+}
