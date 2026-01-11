@@ -187,10 +187,6 @@ APP_STATE.allowedDepartments = DEPT_KEYS.slice(); // full access
 
   applyRBACToUI();
 
-// 🔒 Disable save actions until schedule is loaded
-  setHidden("saveAllBtn", true);
-  setHidden("rosterSaveBtn", true);
-
   
 
   // 🔑 Load schedule first
@@ -219,6 +215,14 @@ async function reloadSchedule() {
   } else {
     await loadSchedulePublic(scheduleDiv);
   }
+}
+/* =========================
+ * Disable Save button until dirty
+ * ========================= */
+function updateSaveState() {
+  const btn = byId("saveAllBtn");
+  if (!btn) return;
+  btn.disabled = !HAS_UNSAVED_CHANGES;
 }
 
 /* =========================
@@ -286,7 +290,24 @@ function showModal(title, bodyHtml, okText = "OK", onOk = null, cancelText = "Ca
   const bodyEl = byId("modalBody");
   const okBtn = byId("modalOk");
   const cancelBtn = byId("modalCancel");
+  const saveAddBtn = byId("modalSaveAddAnother");
 
+if (saveAddBtn) {
+  saveAddBtn.onclick = async () => {
+    if (typeof onOk === "function") {
+      try {
+        const shouldClose = await onOk();
+        if (shouldClose !== false) {
+          // Reset modal body inputs instead of closing
+          bodyEl?.querySelectorAll("input").forEach(i => i.value = "");
+          bodyEl?.querySelector("select")?.focus();
+        }
+      } catch (e) {
+        toast(e.message || String(e), 4500);
+      }
+    }
+  };
+}
   if (titleEl) titleEl.textContent = title || "";
   if (bodyEl) bodyEl.innerHTML = bodyHtml || "";
   if (okBtn) okBtn.textContent = okText || "OK";
@@ -712,9 +733,8 @@ async function loadScheduleAdmin(el) {
 
   renderScheduleAdmin(el);
   refreshTimeline();
-  // 🔓 Schedule loaded — enable save actions
-  setHidden("saveAllBtn", false);
-  setHidden("rosterSaveBtn", false);
+  applyRBACToUI();
+
 
 }
 
@@ -829,9 +849,9 @@ function renderScheduleAdmin(el) {
       }
     };
   });
-
   el.querySelectorAll("input[data-time]").forEach(inp => {
     inp.onchange = () => {
+      HAS_UNSAVED_CHANGES = true;
       const id = inp.getAttribute("data-id");
       const which = inp.getAttribute("data-time");
 
@@ -862,6 +882,7 @@ function renderScheduleAdmin(el) {
 
   el.querySelectorAll("input[data-entry]").forEach(inp => {
     inp.oninput = () => {
+      HAS_UNSAVED_CHANGES = true;
       const entryId = inp.getAttribute("data-entry");
       const dept = inp.getAttribute("data-dept");
       const field = inp.getAttribute("data-field");
@@ -993,6 +1014,8 @@ async function showDiffAndSave() {
       if (!res.ok) throw new Error(await res.text());
 
       toast("Schedule saved.");
+      HAS_UNSAVED_CHANGES = false;      // ✅ ADD THIS
+      updateSaveState?.();              // ✅ OPTIONAL but recommended
       await loadScheduleAdmin(byId("schedule"));
       return true;
     },
@@ -1060,7 +1083,7 @@ async function runAutogen() {
  * ========================= */
 
 async function loadRoster() {
-  const res = await fetchAuth(`/admin/roster`, { method: "GET" });
+  const res = await fetchAuth(`/api/admin/roster`, { method: "GET" });
   if (!res.ok) throw new Error(await res.text());
   const roster = await res.json();
   APP_STATE.roster = roster;
@@ -1077,9 +1100,9 @@ function renderRoster() {
       ${DEPT_KEYS.map(dep => renderRosterDept(dep, roster[dep] || [])).join("")}
     </div>
   `;
-
   el.querySelectorAll("input[data-roster]").forEach(inp => {
     inp.oninput = () => {
+      HAS_UNSAVED_CHANGES = true;
       const dept = inp.getAttribute("data-dept");
       const idx = Number(inp.getAttribute("data-idx"));
       const field = inp.getAttribute("data-field");
@@ -1203,6 +1226,8 @@ async function saveRoster() {
 
   if (!res.ok) throw new Error(await res.text());
   toast("Roster saved.");
+  HAS_UNSAVED_CHANGES = false;      // ✅ ADD THIS
+  updateSaveState?.();              // ✅ OPTIONAL but recommended
   await loadRoster();
 }
 
