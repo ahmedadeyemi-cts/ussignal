@@ -19,6 +19,11 @@
 // SAME ORIGIN — required for Pages Functions + Access
 const API_BASE = window.location.origin;
 
+function apiUrl(path) {
+  return `${API_BASE}${path}`;
+}
+
+
 /* =========================
  * Departments
  * ========================= */
