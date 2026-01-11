@@ -108,7 +108,15 @@
 
 <div id="toast" class="toast hidden"></div>
 
-<script type="module" src="/app.js"></script>
+<script src="/app.js" defer></script>
+<script>
+  window.addEventListener("DOMContentLoaded", () => {
+    initApp(window.__CTX__ || {});
+  });
+</script>
+
+</body>
+</html>
 
 </body>
 </html>
