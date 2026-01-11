@@ -1,5 +1,4 @@
 // functions/api/admin/roster/save.js
-
 export async function onRequestPost({ request, env }) {
   const jwt = request.headers.get("cf-access-jwt-assertion");
   if (!jwt) {
@@ -17,9 +16,8 @@ export async function onRequestPost({ request, env }) {
     return new Response("Invalid roster payload", { status: 400 });
   }
 
-  // TODO: persist roster (KV / D1 / R2)
-  // Example:
-  // await env.ONCALL_KV.put("roster", JSON.stringify(body.roster));
+  // ✅ ACTUAL PERSISTENCE
+  await env.ONCALL_KV.put("roster", JSON.stringify(body.roster));
 
   return new Response(
     JSON.stringify({ ok: true }),
