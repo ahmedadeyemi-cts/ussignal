@@ -15,8 +15,8 @@
 
 "use strict";
 
-// Cloudflare Worker Path
-const API_BASE = "https://api.onenecklab.com";
+// Cloudflare Worker Path (same-origin — required for Cloudflare Access cookie auth)
+const API_BASE = location.origin;
 
 /* =========================
  * Departments
@@ -42,12 +42,8 @@ const DISPLAY_TZ_FIXED_CST = "Etc/GMT+6";
 /* =========================
  * Role-Based Access Control
  * =========================
- * Expect worker to return something like:
+ * Expect ctx from admin.html:
  *   { admin: true, role: "admin"|"editor"|"viewer", email: "...", departments: ["enterprise_network", ...] }
- *
- * - viewer: read-only (even if authenticated)
- * - editor: can edit entries (time + person fields) but NOT roster/autogen/save? (you can choose)
- * - admin: full access (save, roster, autogen, audit, notify, export)
  */
 const ROLE_ORDER = ["viewer", "editor", "admin"];
 function roleAtLeast(role, needed) {
@@ -62,8 +58,8 @@ function roleAtLeast(role, needed) {
 
 let APP_STATE = {
   // identity / permissions
-  isAuthenticated: false, // if you’re showing admin.html behind Access
-  admin: false,           // legacy flag
+  isAuthenticated: false,
+  admin: false,
   role: "viewer",
   email: "",
   allowedDepartments: [],
@@ -79,23 +75,46 @@ let APP_STATE = {
   roster: null,
 
   // timeline state
-  timelineMode: "weeks" // future expansion
+  timelineMode: "weeks"
 };
+
+/* =========================
+ * Fetch helpers (same-origin + Access)
+ * ========================= */
+
+function apiUrl(path) {
+  if (!path) return API_BASE;
+  if (path.startsWith("http://") || path.startsWith("https://")) return path;
+  if (!path.startsWith("/")) path = "/" + path;
+  return `${API_BASE}${path}`;
+}
+
+// Use for protected endpoints that require Access cookie
+async function fetchAuth(path, opts = {}) {
+  const res = await fetch(apiUrl(path), {
+    ...opts,
+    credentials: "include"
+  });
+  return res;
+}
+
+// Use for public endpoints (no auth required)
+async function fetchPublic(path, opts = {}) {
+  const res = await fetch(apiUrl(path), { ...opts });
+  return res;
+}
 
 /* =========================
  * Init
  * ========================= */
 
 function initApp(ctx = {}) {
-  // ctx can be { admin, role, email, departments } (admin page)
-  // or { } (public page)
   APP_STATE.admin = !!ctx.admin;
-  APP_STATE.isAuthenticated = !!ctx.admin; // for your setup, admin implies authenticated
+  APP_STATE.isAuthenticated = !!ctx.admin;
   APP_STATE.role = ctx.role || (APP_STATE.admin ? "admin" : "viewer");
   APP_STATE.email = ctx.email || "";
   APP_STATE.allowedDepartments = Array.isArray(ctx.departments) ? ctx.departments : [];
 
-  // basic wiring
   const themeBtn = byId("themeToggle");
   if (themeBtn) themeBtn.onclick = toggleTheme;
 
@@ -107,28 +126,26 @@ function initApp(ctx = {}) {
     };
   }
 
-  // wire tabs + modal (admin UI typically)
   wireModal();
   wireTabs();
 
-  // Wire buttons (safe even if elements not present)
   onClick("exportBtn", exportExcel);
   onClick("icsBtn", exportICS);
+
   onClick("notifyBtn", () => confirmModal(
     "Send Notifications",
     "Send start and end notifications now?",
     sendNotify
   ));
+
   onClick("revertBtn", () => confirmModal(
     "Revert Schedule",
     "Revert to last saved schedule?",
     revertSchedule
   ));
 
-  // Save button: shows diff preview + auto-resolve conflicts
   onClick("saveAllBtn", saveAllChanges);
 
-  // Roster controls
   onClick("rosterAddUserBtn", rosterAddUserModal);
   onClick("rosterReloadBtn", loadRoster);
   onClick("rosterSaveBtn", () => confirmModal(
@@ -137,27 +154,20 @@ function initApp(ctx = {}) {
     saveRoster
   ));
 
-  // Auto-gen controls
   onClick("runAutogenBtn", () => confirmModal(
     "Auto-Generate Schedule",
     "Auto-generate will overwrite the current schedule. Proceed?",
     runAutogen
   ));
 
-  // Audit refresh
   onClick("auditRefreshBtn", loadAudit);
 
-  // Role-based UI guards (hide admin-only panels/buttons)
   applyRBACToUI();
 
-  // Initial load
   refreshMainView();
 
-  // If admin/editor, load roster lazily if roster panel exists
   if (roleAtLeast(APP_STATE.role, "admin")) {
     if (byId("roster")) loadRoster().catch(e => toast(e.message || String(e), 4000));
-    // audit can be lazy (loads when tab opened) but safe to do once:
-    // loadAudit().catch(()=>{});
   }
 }
 
@@ -290,7 +300,6 @@ function wireTabs() {
       const panel = byId(target);
       if (panel) panel.classList.add("active");
 
-      // Lazy-load
       if (target === "auditTab") loadAudit().catch(() => {});
       if (target === "timelineTab") refreshTimeline().catch(() => {});
     };
@@ -302,24 +311,19 @@ function wireTabs() {
  * ========================= */
 
 function applyRBACToUI() {
-  // If not editor+, hide editing controls if they exist
   const canEdit = roleAtLeast(APP_STATE.role, "editor");
   const isAdmin = roleAtLeast(APP_STATE.role, "admin");
 
-  // Buttons
   setHidden("saveAllBtn", !canEdit);
   setHidden("revertBtn", !isAdmin);
   setHidden("notifyBtn", !isAdmin);
   setHidden("exportBtn", !isAdmin);
-  // ICS export is useful for everyone; keep visible if exists
-  // setHidden("icsBtn", false);
 
-  // Tabs/panels
-  setHidden("rosterTabBtn", !isAdmin); // if your tab button has this id
+  // Optional tab button IDs if you add them; safe no-ops otherwise
+  setHidden("rosterTabBtn", !isAdmin);
   setHidden("autogenTabBtn", !isAdmin);
   setHidden("auditTabBtn", !isAdmin);
 
-  // Panels themselves (if you prefer hard-hide)
   setHidden("rosterTab", !isAdmin);
   setHidden("autogenTab", !isAdmin);
   setHidden("auditTab", !isAdmin);
@@ -333,10 +337,7 @@ function setHidden(id, hidden) {
 
 /* =========================
  * Time Utilities
- * =========================
- * Convert: interpret "YYYY-MM-DDTHH:mm:ss" as America/Denver wall time,
- * then render in fixed CST (UTC-6) and append "CST".
- */
+ * ========================= */
 
 function parseLocalIsoParts(localISO) {
   const m = String(localISO || "").match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/);
@@ -373,10 +374,8 @@ function zonedWallTimeToUtcMs(localISO, timeZone) {
   const want = parseLocalIsoParts(localISO);
   if (!want) return null;
 
-  // initial guess: treat wall time as UTC
   let guessMs = Date.UTC(want.y, want.mo - 1, want.d, want.h, want.mi, want.s);
 
-  // Two-pass correction handles DST edges robustly
   for (let i = 0; i < 2; i++) {
     const got = getTZParts(new Date(guessMs), timeZone);
     const deltaMin = diffMinutes(want, got);
@@ -401,10 +400,8 @@ function formatCSTFromDenverLocal(localISO) {
   return `${s} CST`;
 }
 
-// Helpers for Friday-only snapping + input formatting
 function isFriday(d) { return d.getDay() === 5; }
 
-// nearest Friday forward (including same day)
 function snapToFridayForward(d) {
   const copy = new Date(d);
   const diff = (5 - copy.getDay() + 7) % 7;
@@ -417,9 +414,7 @@ function toLocalInput(d) {
   return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-// For validation we treat ISO string as local-like string. Safer to parse components.
 function isoToDateLocalAssumed(iso) {
-  // Treat "YYYY-MM-DDTHH:mm:ss" as local time string (no timezone shift)
   const parts = parseLocalIsoParts(iso);
   if (!parts) return new Date(NaN);
   return new Date(parts.y, parts.mo - 1, parts.d, parts.h, parts.mi, parts.s, 0);
@@ -427,10 +422,7 @@ function isoToDateLocalAssumed(iso) {
 
 /* =========================
  * Validation
- * =========================
- * Window: Fri 4:00 PM → Fri 7:00 AM, 7 days apart.
- * Note: This enforces fixed wall-clock times as entered in ISO strings.
- */
+ * ========================= */
 
 function validateOnCallWindow(startISO, endISO) {
   const s = isoToDateLocalAssumed(startISO);
@@ -472,15 +464,8 @@ function detectOverlaps(entries) {
   return overlaps;
 }
 
-/**
- * Auto-resolve conflicts by shifting the CURRENT entry forward to start at previous end,
- * then re-applying Fri times. Since your window must always be Fri 4 PM → Fri 7 AM,
- * we shift by whole weeks until no overlap.
- */
 function autoResolveConflicts(entries) {
   const clone = deepClone(entries);
-
-  // Sort by start time (local-assumed)
   clone.sort((a, b) => isoToDateLocalAssumed(a.startISO) - isoToDateLocalAssumed(b.startISO));
 
   const changes = [];
@@ -489,26 +474,20 @@ function autoResolveConflicts(entries) {
     const prev = clone[i - 1];
     const cur = clone[i];
 
-    let prevEnd = isoToDateLocalAssumed(prev.endISO);
-    let curStart = isoToDateLocalAssumed(cur.startISO);
+    const prevEnd = isoToDateLocalAssumed(prev.endISO);
+    const curStart = isoToDateLocalAssumed(cur.startISO);
 
     if (curStart < prevEnd) {
       const originalStart = cur.startISO;
       const originalEnd = cur.endISO;
 
-      // Move cur forward by whole weeks until it starts >= prevEnd
-      // Step 1: pick a Friday on/after prevEnd
       let newStart = snapToFridayForward(prevEnd);
-      // enforce Fri 4 PM
       newStart.setHours(16, 0, 0, 0);
 
-      // If that newStart is still < prevEnd (e.g., prevEnd Fri 7AM, newStart Fri 4PM same day is > so ok)
-      // but keep while for safety
       while (newStart < prevEnd) {
         newStart.setDate(newStart.getDate() + 7);
       }
 
-      // newEnd = next Friday 7 AM
       const newEnd = new Date(newStart);
       newEnd.setDate(newEnd.getDate() + 7);
       newEnd.setHours(7, 0, 0, 0);
@@ -522,8 +501,6 @@ function autoResolveConflicts(entries) {
         fromStart: originalStart, fromEnd: originalEnd,
         toStart: cur.startISO, toEnd: cur.endISO
       });
-
-      // Now continue; ensure chain resolution works
     }
   }
 
@@ -565,7 +542,6 @@ function diffSchedules(original, draft) {
     }
   }
 
-  // Optional: detect deletions (if your UI ever supports removing entries)
   for (const [id] of origById.entries()) {
     if (!draftById.has(id)) diffs.push(`Entry ${id}: removed`);
   }
@@ -579,13 +555,13 @@ function diffSchedules(original, draft) {
 
 async function loadSchedulePublic(el) {
   const dept = String(APP_STATE.dept || "all").toLowerCase();
-  const res = await fetch(`${API_BASE}/oncall?department=${encodeURIComponent(dept)}`);
+  const res = await fetchPublic(`/oncall?department=${encodeURIComponent(dept)}`);
   if (!res.ok) throw new Error(await res.text());
   const data = await res.json();
   APP_STATE.schedulePublic = data;
 
   renderScheduleReadOnly(el, data.entries || []);
-  refreshTimeline(); // if timeline panel exists
+  refreshTimeline();
 }
 
 function renderScheduleReadOnly(el, entries) {
@@ -669,8 +645,8 @@ function renderDeptBlocks(depts, editable, entryId, restrictToAllowedDepts) {
  * ========================= */
 
 async function loadScheduleAdmin(el) {
-  // Admin endpoint should enforce auth and role server-side as well.
-  const res = await fetch(`${API_BASE}/admin/oncall`);
+  // PROTECTED: same-origin + credentials include
+  const res = await fetchAuth(`/oncall`, { method: "GET" });
   if (!res.ok) throw new Error(await res.text());
   const data = await res.json();
 
@@ -689,13 +665,10 @@ function renderScheduleAdmin(el) {
   el.innerHTML = "";
 
   const deptFilter = String(APP_STATE.dept || "all").toLowerCase();
-
-  // For editors: optionally restrict to allowed depts
   const restrictToAllowedDepts = roleAtLeast(APP_STATE.role, "admin") ? false : true;
 
   const entries = (APP_STATE.draftSchedule?.entries || []).map(e => {
     if (deptFilter === "all") return e;
-
     const only = e.departments?.[deptFilter];
     return { ...e, departments: only ? { [deptFilter]: only } : {} };
   });
@@ -763,7 +736,6 @@ function renderScheduleAdmin(el) {
     `;
   });
 
-  // Wire actions
   el.querySelectorAll("button[data-action]").forEach(btn => {
     btn.onclick = async () => {
       const action = btn.getAttribute("data-action");
@@ -784,7 +756,7 @@ function renderScheduleAdmin(el) {
           "Notify This Week",
           "Send start and end notifications for this entry?",
           async () => {
-            const res = await fetch(`${API_BASE}/admin/oncall/notify`, {
+            const res = await fetchAuth(`/oncall/notify`, {
               method: "POST",
               headers: { "content-type": "application/json" },
               body: JSON.stringify({ mode: "both", entryId: id })
@@ -798,35 +770,29 @@ function renderScheduleAdmin(el) {
     };
   });
 
-  // Wire time editors (Friday-only date pickers behavior)
   el.querySelectorAll("input[data-time]").forEach(inp => {
     inp.onchange = () => {
       const id = inp.getAttribute("data-id");
-      const which = inp.getAttribute("data-time"); // start/end
+      const which = inp.getAttribute("data-time");
 
       const entry = (APP_STATE.draftSchedule?.entries || []).find(x => String(x.id) === String(id));
       if (!entry) return;
 
-      // Parse input as local date
       let d = new Date(inp.value);
       if (isNaN(d)) return;
 
-      // Snap to Friday forward
       if (!isFriday(d)) d = snapToFridayForward(d);
 
-      // Enforce fixed times
       if (which === "start") d.setHours(16, 0, 0, 0);
       else d.setHours(7, 0, 0, 0);
 
       const fixed = toLocalInput(d);
-      inp.value = fixed; // keep UI snapped
+      inp.value = fixed;
 
-      // Update entry ISO (seconds)
       const newISO = fixed + ":00";
       if (which === "start") entry.startISO = newISO;
       else entry.endISO = newISO;
 
-      // Optional immediate validation hint
       const err = validateOnCallWindow(entry.startISO, entry.endISO);
       if (err) toast(`Entry ${entry.id}: ${err}`, 3200);
 
@@ -834,7 +800,6 @@ function renderScheduleAdmin(el) {
     };
   });
 
-  // Wire inline dept inputs
   el.querySelectorAll("input[data-entry]").forEach(inp => {
     inp.oninput = () => {
       const entryId = inp.getAttribute("data-entry");
@@ -878,7 +843,6 @@ async function saveAllChanges() {
 
   const draft = APP_STATE.draftSchedule;
 
-  // 1) Validate windows
   for (const e of (draft.entries || [])) {
     const err = validateOnCallWindow(e.startISO, e.endISO);
     if (err) {
@@ -887,10 +851,8 @@ async function saveAllChanges() {
     }
   }
 
-  // 2) Overlap detection
   const overlaps = detectOverlaps(draft.entries || []);
   if (overlaps.length) {
-    // Auto-resolution only for admins (safer); editors can be blocked or allowed—your choice.
     if (!isAdmin) {
       toast(overlaps.map(o => o.message).join("; "), 5000);
       return;
@@ -904,7 +866,6 @@ async function saveAllChanges() {
       return;
     }
 
-    // Preview auto-resolve changes
     const changesHtml = changes.length
       ? `<ul>${changes.map(c => `
           <li>
@@ -929,21 +890,17 @@ async function saveAllChanges() {
       `,
       "Continue",
       async () => {
-        // apply resolved schedule
         draft.entries = resolvedEntries;
         refreshTimeline();
-
-        // now show diff + save confirmation
         await showDiffAndSave();
         return true;
       },
       "Cancel"
     );
 
-    return; // stop here; save continues via modal
+    return;
   }
 
-  // No overlaps -> go to diff preview + save
   await showDiffAndSave();
 }
 
@@ -968,7 +925,7 @@ async function showDiffAndSave() {
     `,
     "Save",
     async () => {
-      const res = await fetch(`${API_BASE}/admin/oncall/save`, {
+      const res = await fetchAuth(`/oncall/save`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ schedule: draft })
@@ -976,7 +933,6 @@ async function showDiffAndSave() {
       if (!res.ok) throw new Error(await res.text());
 
       toast("Schedule saved.");
-      // reload authoritative copy
       await loadScheduleAdmin(byId("schedule"));
       return true;
     },
@@ -985,26 +941,19 @@ async function showDiffAndSave() {
 }
 
 async function exportExcel() {
-  // keep admin-only in UI guard, but safe anyway
   const dept = String(APP_STATE.dept || "all");
-  window.location = `${API_BASE}/admin/oncall/export?department=${encodeURIComponent(dept)}`;
+  // Use same-origin download so Access can authorize it
+  window.location = apiUrl(`/oncall/export?department=${encodeURIComponent(dept)}`);
 }
 
 async function exportICS() {
-  // allow both public and admin: choose endpoint if you have both
-  // Recommended:
-  //  - Public: /oncall/ics?department=all (no auth)
-  //  - Admin:  /admin/oncall/ics?department=all (auth)
   const dept = String(APP_STATE.dept || "all").toLowerCase();
-  const endpoint = roleAtLeast(APP_STATE.role, "editor")
-    ? `${API_BASE}/admin/oncall/ics?department=${encodeURIComponent(dept)}`
-    : `${API_BASE}/oncall/ics?department=${encodeURIComponent(dept)}`;
-
-  window.location = endpoint;
+  // Keep it same-origin. Worker decides whether this is public or requires Access.
+  window.location = apiUrl(`/oncall/ics?department=${encodeURIComponent(dept)}`);
 }
 
 async function sendNotify() {
-  const res = await fetch(`${API_BASE}/admin/oncall/notify`, {
+  const res = await fetchAuth(`/oncall/notify`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ mode: "both" })
@@ -1014,7 +963,7 @@ async function sendNotify() {
 }
 
 async function revertSchedule() {
-  const res = await fetch(`${API_BASE}/admin/oncall/revert`, { method: "POST" });
+  const res = await fetchAuth(`/oncall/revert`, { method: "POST" });
   if (!res.ok) throw new Error(await res.text());
   toast("Reverted.");
   await loadScheduleAdmin(byId("schedule"));
@@ -1035,7 +984,7 @@ async function runAutogen() {
 
   if (!start || !end) throw new Error("Start and end dates are required.");
 
-  const res = await fetch(`${API_BASE}/admin/oncall/autogenerate`, {
+  const res = await fetchAuth(`/oncall/autogenerate`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ startYMD: start, endYMD: end, seedIndex: seed })
@@ -1051,7 +1000,7 @@ async function runAutogen() {
  * ========================= */
 
 async function loadRoster() {
-  const res = await fetch(`${API_BASE}/admin/roster`);
+  const res = await fetchAuth(`/roster`, { method: "GET" });
   if (!res.ok) throw new Error(await res.text());
   const roster = await res.json();
   APP_STATE.roster = roster;
@@ -1069,7 +1018,6 @@ function renderRoster() {
     </div>
   `;
 
-  // wire inline edits
   el.querySelectorAll("input[data-roster]").forEach(inp => {
     inp.oninput = () => {
       const dept = inp.getAttribute("data-dept");
@@ -1081,7 +1029,6 @@ function renderRoster() {
     };
   });
 
-  // wire remove
   el.querySelectorAll("button[data-roster-remove]").forEach(btn => {
     btn.onclick = () => {
       const dept = btn.getAttribute("data-dept");
@@ -1188,7 +1135,7 @@ function rosterAddUserModal() {
 async function saveRoster() {
   if (!APP_STATE.roster) throw new Error("Roster is empty.");
 
-  const res = await fetch(`${API_BASE}/admin/roster/save`, {
+  const res = await fetchAuth(`/roster/save`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ roster: APP_STATE.roster })
@@ -1209,7 +1156,7 @@ async function loadAudit() {
 
   el.innerHTML = `<div class="subtle">Loading audit log…</div>`;
 
-  const res = await fetch(`${API_BASE}/admin/audit`);
+  const res = await fetchAuth(`/audit`, { method: "GET" });
   if (!res.ok) {
     el.innerHTML = `<div class="subtle">Unable to load audit log.</div>`;
     return;
@@ -1240,18 +1187,14 @@ async function loadAudit() {
 
 /* =========================
  * Timeline UI (Calendar-like)
- * =========================
- * Uses a simple week-by-week track. Each entry is one week.
- * For each week, show dept assignments as colored blocks.
- */
+ * ========================= */
 
 function deptColor(dep) {
-  // stable distinct colors without needing CSS variables
   switch (dep) {
-    case "enterprise_network": return "rgba(59,130,246,0.35)"; // blue
-    case "collaboration": return "rgba(34,197,94,0.35)";       // green
-    case "system_storage": return "rgba(234,179,8,0.35)";       // amber
-    default: return "rgba(148,163,184,0.35)";                   // slate
+    case "enterprise_network": return "rgba(59,130,246,0.35)";
+    case "collaboration": return "rgba(34,197,94,0.35)";
+    case "system_storage": return "rgba(234,179,8,0.35)";
+    default: return "rgba(148,163,184,0.35)";
   }
 }
 
@@ -1259,7 +1202,6 @@ function refreshTimeline() {
   const timeline = byId("timeline");
   if (!timeline) return;
 
-  // Prefer draft schedule (admin/editor) else public
   const entries =
     (APP_STATE.draftSchedule && APP_STATE.draftSchedule.entries) ||
     (APP_STATE.schedulePublic && APP_STATE.schedulePublic.entries) ||
@@ -1276,7 +1218,6 @@ function renderTimeline(el, entries) {
     return;
   }
 
-  // Sort by start
   const sorted = [...entries].sort((a, b) => isoToDateLocalAssumed(a.startISO) - isoToDateLocalAssumed(b.startISO));
 
   sorted.forEach(e => {
@@ -1309,7 +1250,6 @@ function renderTimelineBlocks(entry) {
     return `<div class="timeline-empty small subtle">No assignments</div>`;
   }
 
-  // Side-by-side blocks for departments
   const width = Math.max(1, Math.floor(100 / keys.length));
   return keys.map((dep, i) => {
     const p = depts[dep] || {};
