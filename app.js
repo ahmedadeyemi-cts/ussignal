@@ -121,22 +121,25 @@ async function initApp(ctx = {}) {
   APP_STATE.role = ctx.role || (APP_STATE.admin ? "admin" : "viewer");
   APP_STATE.email = ctx.email || "";
   APP_STATE.allowedDepartments = Array.isArray(ctx.departments) ? ctx.departments : [];
-  // ✅ Role badge belongs HERE
+   // =========================
+  // Role Badge
+  // =========================
   const badge = byId("roleBadge");
   if (badge) {
     badge.textContent = APP_STATE.role.toUpperCase();
     badge.className = `role-badge role-${APP_STATE.role}`;
+  }
 
+  // =========================
+  // Theme Initialization
+  // =========================
   const savedTheme = localStorage.getItem(THEME_KEY) || "light";
-applyTheme(savedTheme);
+  applyTheme(savedTheme);
 
-const themeBtn = byId("themeToggle");
-if (themeBtn) themeBtn.onclick = toggleTheme;
-
-    
   const themeBtn = byId("themeToggle");
-  if (themeBtn) themeBtn.onclick = toggleTheme;
-
+  if (themeBtn) {
+    themeBtn.onclick = toggleTheme;
+  }
   const filter = byId("deptFilter");
   if (filter) {
     filter.onchange = () => {
