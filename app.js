@@ -294,7 +294,7 @@ function wireModal() {
   if (close) close.onclick = hideModal;
   if (cancel) cancel.onclick = hideModal;
 
-  mmodal.addEventListener("mousedown", (e) => {
+  modal.addEventListener("mousedown", (e) => {
   if (e.target.id === "modal") hideModal();
 });
 }
