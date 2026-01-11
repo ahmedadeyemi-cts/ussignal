@@ -14,11 +14,12 @@
 // ======================================================
 
 "use strict";
+const THEME_KEY = "oncall-theme";
 
 // Cloudflare Worker Path (same-origin — required for Cloudflare Access cookie auth)
 // SAME ORIGIN — required for Pages Functions + Access
 const API_BASE = "https://api.onenecklab.com";
-
+let HAS_UNSAVED_CHANGES = false;
 
 /* =========================
  * Departments
@@ -53,6 +54,11 @@ function roleAtLeast(role, needed) {
   const b = ROLE_ORDER.indexOf(String(needed || "viewer"));
   return a >= b;
 }
+window.addEventListener("beforeunload", (e) => {
+  if (!HAS_UNSAVED_CHANGES) return;
+  e.preventDefault();
+  e.returnValue = "";
+});
 
 /* =========================
  * Global App State
@@ -105,11 +111,6 @@ async function fetchPublic(path, opts = {}) {
   const res = await fetch(apiUrl(path), { ...opts });
   return res;
 }
-
-/* =========================
- * Init
- * ========================= */
-
 /* =========================
  * Init
  * ========================= */
@@ -120,7 +121,19 @@ async function initApp(ctx = {}) {
   APP_STATE.role = ctx.role || (APP_STATE.admin ? "admin" : "viewer");
   APP_STATE.email = ctx.email || "";
   APP_STATE.allowedDepartments = Array.isArray(ctx.departments) ? ctx.departments : [];
+  // ✅ Role badge belongs HERE
+  const badge = byId("roleBadge");
+  if (badge) {
+    badge.textContent = APP_STATE.role.toUpperCase();
+    badge.className = `role-badge role-${APP_STATE.role}`;
 
+  const savedTheme = localStorage.getItem(THEME_KEY) || "light";
+applyTheme(savedTheme);
+
+const themeBtn = byId("themeToggle");
+if (themeBtn) themeBtn.onclick = toggleTheme;
+
+    
   const themeBtn = byId("themeToggle");
   if (themeBtn) themeBtn.onclick = toggleTheme;
 
@@ -231,10 +244,17 @@ function toast(msg, ms = 2500) {
   setTimeout(() => el.classList.add("hidden"), ms);
 }
 
-function toggleTheme() {
-  document.body.classList.toggle("dark");
-  document.body.classList.toggle("light");
+function applyTheme(theme) {
+  document.body.classList.remove("light", "dark");
+  document.body.classList.add(theme);
+  localStorage.setItem(THEME_KEY, theme);
 }
+
+function toggleTheme() {
+  const isDark = document.body.classList.contains("dark");
+  applyTheme(isDark ? "light" : "dark");
+}
+
 
 /* =========================
  * Modal Helpers
@@ -314,13 +334,23 @@ function wireTabs() {
 
   tabs.forEach(tab => {
     tab.onclick = () => {
+      const required = tab.dataset.requires;
+      const allowed =
+        !required || roleAtLeast(APP_STATE.role, required);
+
       tabs.forEach(t => t.classList.remove("active"));
-      document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
+      document.querySelectorAll(".panel")
+        .forEach(p => p.classList.remove("active"));
 
       tab.classList.add("active");
+
+      if (!allowed) {
+        byId("accessDeniedTab")?.classList.add("active");
+        return;
+      }
+
       const target = tab.dataset.tab;
-      const panel = byId(target);
-      if (panel) panel.classList.add("active");
+      byId(target)?.classList.add("active");
 
       if (target === "auditTab") loadAudit().catch(() => {});
       if (target === "timelineTab") refreshTimeline().catch(() => {});
