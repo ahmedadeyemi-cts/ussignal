@@ -171,6 +171,12 @@ async function initApp(ctx = {}) {
 
   applyRBACToUI();
 
+// 🔒 Disable save actions until schedule is loaded
+  setHidden("saveAllBtn", true);
+  setHidden("rosterSaveBtn", true);
+
+  
+
   // 🔑 Load schedule first
   const scheduleEl = byId("schedule");
   if (scheduleEl) {
@@ -673,6 +679,10 @@ async function loadScheduleAdmin(el) {
 
   renderScheduleAdmin(el);
   refreshTimeline();
+  // 🔓 Schedule loaded — enable save actions
+  setHidden("saveAllBtn", false);
+  setHidden("rosterSaveBtn", false);
+
 }
 
 function renderScheduleAdmin(el) {
