@@ -17,10 +17,13 @@
 
 // Cloudflare Worker Path (same-origin — required for Cloudflare Access cookie auth)
 // SAME ORIGIN — required for Pages Functions + Access
-const API_BASE = window.location.origin;
+const API_BASE = "https://api.onenecklab.com";
 
-function apiUrl(path) {
-  return `${API_BASE}${path}`;
+export async function fetchAuth(path, options = {}) {
+  return fetch(`${API_BASE}${path}`, {
+    ...options,
+    credentials: "include"
+  });
 }
 
 
