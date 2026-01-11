@@ -18,7 +18,7 @@ const THEME_KEY = "oncall-theme";
 
 // Cloudflare Worker Path (same-origin — required for Cloudflare Access cookie auth)
 // SAME ORIGIN — required for Pages Functions + Access
-const API_BASE = "https://api.onenecklab.com";
+const API_BASE = "";
 let HAS_UNSAVED_CHANGES = false;
 
 /* =========================
