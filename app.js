@@ -116,11 +116,12 @@ async function fetchPublic(path, opts = {}) {
  * ========================= */
 
 async function initApp(ctx = {}) {
-  APP_STATE.admin = !!ctx.admin;
-  APP_STATE.isAuthenticated = !!ctx.admin;
-  APP_STATE.role = ctx.role || (APP_STATE.admin ? "admin" : "viewer");
-  APP_STATE.email = ctx.email || "";
-  APP_STATE.allowedDepartments = Array.isArray(ctx.departments) ? ctx.departments : [];
+// NEW — Cloudflare Access = Admin
+APP_STATE.isAuthenticated = true;
+APP_STATE.admin = true;
+APP_STATE.role = "admin";
+APP_STATE.email = ctx.email || "";
+APP_STATE.allowedDepartments = DEPT_KEYS.slice(); // full access
    // =========================
   // Role Badge
   // =========================
@@ -356,7 +357,7 @@ function wireTabs() {
       byId(target)?.classList.add("active");
 
       if (target === "auditTab") loadAudit().catch(() => {});
-      if (target === "timelineTab") refreshTimeline().catch(() => {});
+      if (target === "timelineTab") refreshTimeline();
     };
   });
 }
