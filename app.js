@@ -16,7 +16,14 @@
 "use strict";
 
 // Cloudflare Worker Path (same-origin — required for Cloudflare Access cookie auth)
-const API_BASE = window.location.origin;
+const API_BASE = "https://api.onenecklab.com";
+
+async function fetchAuth(path, opts = {}) {
+  return fetch(`${API_BASE}${path}`, {
+    ...opts,
+    credentials: "include"
+  });
+}
 
 /* =========================
  * Departments
