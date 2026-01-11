@@ -119,10 +119,14 @@ async function initApp(ctx = {}) {
 // =========================
 // AUTH FROM CLOUDFLARE ACCESS
 // =========================
-APP_STATE.isAuthenticated = Boolean(ctx && ctx.email);
-APP_STATE.admin = Boolean(ctx && ctx.admin === true);
-APP_STATE.role = ctx?.role || (APP_STATE.admin ? "admin" : "viewer");
+// Cloudflare Access already authenticated the user if admin.html loaded
+APP_STATE.isAuthenticated = true;
+APP_STATE.admin = true;
+APP_STATE.role = "admin";
+
+// Optional: email if Access injected it
 APP_STATE.email = ctx?.email || "";
+
 APP_STATE.allowedDepartments = Array.isArray(ctx?.departments)
   ? ctx.departments
   : DEPT_KEYS.slice(); // fallback
@@ -199,31 +203,22 @@ APP_STATE.allowedDepartments = Array.isArray(ctx?.departments)
   // =========================
   const scheduleEl = byId("schedule");
 
- if (scheduleEl) {
-  if (APP_STATE.isAuthenticated && APP_STATE.admin) {
-    try {
-      await loadScheduleAdmin(scheduleEl);
-    } catch (e) {
-      console.error("Schedule admin load failed:", e);
-      toast("Admin access denied by Cloudflare.", 5000);
-    }
-  } else {
-    try {
-      await loadSchedulePublic(scheduleEl);
-    } catch (e) {
-      console.error("Public schedule load failed:", e);
-      toast("Unable to load public schedule.", 5000);
-    }
+if (scheduleEl) {
+  try {
+    await loadScheduleAdmin(scheduleEl);
+  } catch (e) {
+    console.error("Schedule admin load failed:", e);
+    toast("Admin access denied by Cloudflare.", 5000);
   }
 }
-  if (APP_STATE.isAuthenticated && APP_STATE.admin && byId("roster")) {
-    try {
-      await loadRoster();
-    } catch (e) {
-      console.error("Roster load failed:", e);
-      toast("Unable to load roster.", 5000);
-    }
+if (byId("roster")) {
+  try {
+    await loadRoster();
+  } catch (e) {
+    console.error("Roster load failed:", e);
+    toast("Unable to load roster.", 5000);
   }
+}
 
 } // ✅ THIS CLOSES initApp
 
@@ -422,10 +417,6 @@ function applyRBACToUI() {
   setHidden("rosterTabBtn", !isAdmin);
   setHidden("autogenTabBtn", !isAdmin);
   setHidden("auditTabBtn", !isAdmin);
-
-  setHidden("rosterTab", !isAdmin);
-  setHidden("autogenTab", !isAdmin);
-  setHidden("auditTab", !isAdmin);
 }
 
 function setHidden(id, hidden) {
