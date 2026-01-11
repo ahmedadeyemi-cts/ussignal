@@ -111,6 +111,10 @@ async function fetchPublic(path, opts = {}) {
  * Init
  * ========================= */
 
+/* =========================
+ * Init
+ * ========================= */
+
 async function initApp(ctx = {}) {
   APP_STATE.admin = !!ctx.admin;
   APP_STATE.isAuthenticated = !!ctx.admin;
@@ -125,7 +129,7 @@ async function initApp(ctx = {}) {
   if (filter) {
     filter.onchange = () => {
       APP_STATE.dept = filter.value || "all";
-      reloadSchedule();
+      reloadSchedule().catch(e => toast(e.message || String(e), 4000));
     };
   }
 
@@ -165,32 +169,25 @@ async function initApp(ctx = {}) {
 
   onClick("auditRefreshBtn", loadAudit);
 
- applyRBACToUI();
+  applyRBACToUI();
 
-/**
- * 🔑 CRITICAL FIX:
- * Always load the admin schedule first so roster + autogen
- * have a valid schedule context.
- */
-if (APP_STATE.admin || roleAtLeast(APP_STATE.role, "editor")) {
+  // 🔑 Load schedule first
   const scheduleEl = byId("schedule");
   if (scheduleEl) {
-    await loadScheduleAdmin(scheduleEl);
+    if (APP_STATE.admin || roleAtLeast(APP_STATE.role, "editor")) {
+      await loadScheduleAdmin(scheduleEl);
+    } else {
+      await loadSchedulePublic(scheduleEl);
+    }
   }
-} else {
-  const scheduleEl = byId("schedule");
-  if (scheduleEl) {
-    await loadSchedulePublic(scheduleEl);
-  }
-}
 
-// Now it is safe to load roster
-if (roleAtLeast(APP_STATE.role, "admin")) {
-  if (byId("roster")) {
+  // ✅ Now safe to load roster
+  if (roleAtLeast(APP_STATE.role, "admin") && byId("roster")) {
     await loadRoster();
   }
-}
+} // ✅ THIS CLOSES initApp
 
+// ✅ Keep this at top-level (not nested)
 async function reloadSchedule() {
   const scheduleDiv = byId("schedule");
   if (!scheduleDiv) return;
@@ -592,7 +589,7 @@ function renderScheduleReadOnly(el, entries) {
       <div class="schedule-card">
         <div class="card-head">
           <div class="card-title">
-            ${escapeHtml(formatCSTFromDenverLocal(e.startISO))} → ${escapeHtml(formatCSTFromDenverLocal(e.endISO))}
+            ${escapeHtml(formatCSTFromChicagoLocal(e.startISO))} → ${escapeHtml(formatCSTFromChicagoLocal(e.endISO))}
           </div>
           <div class="small subtle">Read-only · CST</div>
         </div>
@@ -696,8 +693,8 @@ function renderScheduleAdmin(el) {
   entries.forEach(e => {
     const editing = APP_STATE.editingEntryIds.has(String(e.id));
 
-    const startDisplay = formatCSTFromDenverLocal(e.startISO);
-    const endDisplay = formatCSTFromDenverLocal(e.endISO);
+    const startDisplay = formatCSTFromChicagoLocal(e.startISO);
+    const endDisplay = formatCSTFromChicagoLocal(e.endISO);
 
     const startInput = (e.startISO || "").slice(0, 16);
     const endInput = (e.endISO || "").slice(0, 16);
@@ -891,11 +888,11 @@ async function saveAllChanges() {
           <li>
             Entry ${escapeHtml(String(c.id))} shifted:<br/>
             <span class="small subtle">
-              ${escapeHtml(formatCSTFromDenverLocal(c.fromStart))} → ${escapeHtml(formatCSTFromDenverLocal(c.fromEnd))}
+              ${escapeHtml(formatCSTFromChicagoLocal(c.fromStart))} → ${escapeHtml(formatCSTFromChicagoLocal(c.fromEnd))}
               <br/>
               to
               <br/>
-              ${escapeHtml(formatCSTFromDenverLocal(c.toStart))} → ${escapeHtml(formatCSTFromDenverLocal(c.toEnd))}
+              ${escapeHtml(formatCSTFromChicagoLocal(c.toStart))} → ${escapeHtml(formatCSTFromChicagoLocal(c.toEnd))}
             </span>
           </li>
         `).join("")}</ul>`
@@ -1242,8 +1239,8 @@ function renderTimeline(el, entries) {
 
   sorted.forEach(e => {
     const startLabel = formatWeekLabel(e.startISO);
-    const startDisp = formatCSTFromDenverLocal(e.startISO);
-    const endDisp = formatCSTFromDenverLocal(e.endISO);
+    const startDisp = formatCSTFromChicagoLocal(e.startISO);
+    const endDisp = formatCSTFromChicagoLocal(e.endISO);
 
     const row = document.createElement("div");
     row.className = "timeline-row-wrap";
