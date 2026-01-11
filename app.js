@@ -177,7 +177,7 @@ APP_STATE.allowedDepartments = Array.isArray(ctx?.departments)
 
   onClick("saveAllBtn", saveAllChanges);
 
-  onClick("rosterAddUserBtn", rosterAddUserModal);
+
   onClick("rosterReloadBtn", loadRoster);
   onClick("rosterSaveBtn", () => confirmModal(
     "Save Roster",
@@ -1113,27 +1113,29 @@ function renderRoster() {
       ${DEPT_KEYS.map(dep => renderRosterDept(dep, roster[dep] || [])).join("")}
     </div>
   `;
+
+  // existing input handlers...
   el.querySelectorAll("input[data-roster]").forEach(inp => {
     inp.oninput = () => {
       HAS_UNSAVED_CHANGES = true;
       const dept = inp.getAttribute("data-dept");
       const idx = Number(inp.getAttribute("data-idx"));
       const field = inp.getAttribute("data-field");
-      const roster2 = APP_STATE.roster || {};
-      if (!roster2[dept] || !roster2[dept][idx]) return;
-      roster2[dept][idx][field] = inp.value;
+      if (!APP_STATE.roster?.[dept]?.[idx]) return;
+      APP_STATE.roster[dept][idx][field] = inp.value;
     };
   });
 
+  // existing remove handlers...
   el.querySelectorAll("button[data-roster-remove]").forEach(btn => {
     btn.onclick = () => {
       const dept = btn.getAttribute("data-dept");
       const idx = Number(btn.getAttribute("data-idx"));
-      if (!APP_STATE.roster || !APP_STATE.roster[dept]) return;
+      if (!APP_STATE.roster?.[dept]) return;
 
       showModal(
         "Remove User",
-        `<div>Remove this user from <b>${escapeHtml(DEPT_LABELS[dept] || dept)}</b> roster?</div>`,
+        `<div>Remove this user from <b>${escapeHtml(DEPT_LABELS[dept])}</b> roster?</div>`,
         "Remove",
         async () => {
           APP_STATE.roster[dept].splice(idx, 1);
@@ -1145,6 +1147,12 @@ function renderRoster() {
       );
     };
   });
+
+  // ✅ ADD USER BUTTON FIX (THIS IS THE KEY)
+  const addBtn = byId("rosterAddUserBtn");
+  if (addBtn) {
+    addBtn.onclick = rosterAddUserModal;
+  }
 }
 
 function renderRosterDept(deptKey, list) {
