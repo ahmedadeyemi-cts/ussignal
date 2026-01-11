@@ -271,3 +271,27 @@ button {
 .toast.hidden {
   display: none;
 }
+.role-badge {
+  margin-left: 10px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.role-admin {
+  background: #1d4ed8;
+  color: white;
+}
+
+.role-editor {
+  background: #16a34a;
+  color: white;
+}
+
+.role-viewer {
+  background: #9ca3af;
+  color: white;
+}
