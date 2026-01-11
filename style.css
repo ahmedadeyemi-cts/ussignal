@@ -402,3 +402,11 @@ body {
 .modal-actions .primary {
   min-width: 88px;
 }
+.modal {
+  opacity: 0;
+  pointer-events: none;
+}
+.modal.modal-open {
+  opacity: 1;
+  pointer-events: auto;
+}
