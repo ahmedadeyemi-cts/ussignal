@@ -1298,17 +1298,4 @@ function formatWeekLabel(startISO) {
   return d.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
 }
 
-/* =========================
- * Optional: expose init globally
- * ========================= */
-// Auto-initialize when loaded as module
-initApp({
-  admin: true,
-  role: "admin",
-  email: "admin@ussignal.com",
-  departments: [
-    "enterprise_network",
-    "collaboration",
-    "system_storage"
-  ]
-});
+
