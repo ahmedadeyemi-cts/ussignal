@@ -16,10 +16,7 @@
 "use strict";
 
 // Cloudflare Worker Path (same-origin — required for Cloudflare Access cookie auth)
-const API_BASE =
-  location.hostname.endsWith("github.io")
-    ? "https://api.onenecklab.com"
-    : location.origin;
+const API_BASE = window.location.origin;
 
 /* =========================
  * Departments
