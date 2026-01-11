@@ -611,7 +611,7 @@ function diffSchedules(original, draft) {
 
 async function loadSchedulePublic(el) {
   const dept = String(APP_STATE.dept || "all").toLowerCase();
-  const res = await fetchPublic(`/oncall?department=${encodeURIComponent(dept)}`);
+  const res = await fetchPublic(`/api/oncall?department=${encodeURIComponent(dept)}`);
   if (!res.ok) throw new Error(await res.text());
   const data = await res.json();
   APP_STATE.schedulePublic = data;
@@ -702,7 +702,7 @@ function renderDeptBlocks(depts, editable, entryId, restrictToAllowedDepts) {
 
 async function loadScheduleAdmin(el) {
   // PROTECTED: same-origin + credentials include
-  const res = await fetchAuth(`/admin/oncall`, { method: "GET" });
+  const res = await fetchAuth(`/api/admin/oncall`, { method: "GET" });
   if (!res.ok) throw new Error(await res.text());
   const data = await res.json();
 
@@ -816,7 +816,7 @@ function renderScheduleAdmin(el) {
           "Notify This Week",
           "Send start and end notifications for this entry?",
           async () => {
-            const res = await fetchAuth(`/admin/oncall/notify`, {
+            const res = await fetchAuth(`/api/admin/oncall/notify`, {
               method: "POST",
               headers: { "content-type": "application/json" },
               body: JSON.stringify({ mode: "both", entryId: id })
@@ -985,7 +985,7 @@ async function showDiffAndSave() {
     `,
     "Save",
     async () => {
-      const res = await fetchAuth(`/admin/oncall/save`, {
+      const res = await fetchAuth(`/api/admin/oncall/save`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ schedule: draft })
@@ -1003,7 +1003,7 @@ async function showDiffAndSave() {
 async function exportExcel() {
   const dept = String(APP_STATE.dept || "all");
   // Use same-origin download so Access can authorize it
-  window.location = apiUrl(`/oncall/export?department=${encodeURIComponent(dept)}`);
+  window.location = apiUrl(`/api/oncall/export?department=${encodeURIComponent(dept)}`);
 }
 
 async function exportICS() {
@@ -1013,7 +1013,7 @@ async function exportICS() {
 }
 
 async function sendNotify() {
-  const res = await fetchAuth(`/admin/oncall/notify`, {
+  const res = await fetchAuth(`/api/admin/oncall/notify`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ mode: "both" })
@@ -1023,7 +1023,7 @@ async function sendNotify() {
 }
 
 async function revertSchedule() {
-  const res = await fetchAuth(`/admin/oncall/revert`, { method: "POST" });
+  const res = await fetchAuth(`/api/admin/oncall/revert`, { method: "POST" });
   if (!res.ok) throw new Error(await res.text());
   toast("Reverted.");
   await loadScheduleAdmin(byId("schedule"));
@@ -1044,7 +1044,7 @@ async function runAutogen() {
 
   if (!start || !end) throw new Error("Start and end dates are required.");
 
-  const res = await fetchAuth(`/admin/oncall/autogenerate`, {
+  const res = await fetchAuth(`/api/admin/oncall/autogenerate`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ startYMD: start, endYMD: end, seedIndex: seed })
@@ -1195,7 +1195,7 @@ function rosterAddUserModal() {
 async function saveRoster() {
   if (!APP_STATE.roster) throw new Error("Roster is empty.");
 
-  const res = await fetchAuth(`/admin/roster/save`, {
+  const res = await fetchAuth(`/api/admin/roster/save`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ roster: APP_STATE.roster })
@@ -1216,7 +1216,7 @@ async function loadAudit() {
 
   el.innerHTML = `<div class="subtle">Loading audit log…</div>`;
 
-  const res = await fetchAuth(`/admin/audit`, { method: "GET" });
+  const res = await fetchAuth(`/api/admin/audit`, { method: "GET" });
   if (!res.ok) {
     el.innerHTML = `<div class="subtle">Unable to load audit log.</div>`;
     return;
