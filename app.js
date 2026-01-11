@@ -185,24 +185,43 @@ APP_STATE.allowedDepartments = DEPT_KEYS.slice(); // full access
 
   onClick("auditRefreshBtn", loadAudit);
 
+    // =========================
+  // FINALIZE UI FIRST (SAFE)
+  // =========================
   applyRBACToUI();
 
-  
-
-  // 🔑 Load schedule first
+  // =========================
+  // LOAD DATA (NON-BLOCKING)
+  // =========================
   const scheduleEl = byId("schedule");
+
   if (scheduleEl) {
     if (APP_STATE.admin || roleAtLeast(APP_STATE.role, "editor")) {
-      await loadScheduleAdmin(scheduleEl);
+      try {
+        await loadScheduleAdmin(scheduleEl);
+      } catch (e) {
+        console.error("Schedule admin load failed:", e);
+        toast("Unable to load admin schedule. Access may be misconfigured.", 5000);
+      }
     } else {
-      await loadSchedulePublic(scheduleEl);
+      try {
+        await loadSchedulePublic(scheduleEl);
+      } catch (e) {
+        console.error("Public schedule load failed:", e);
+        toast("Unable to load schedule.", 5000);
+      }
     }
   }
 
-  // ✅ Now safe to load roster
   if (roleAtLeast(APP_STATE.role, "admin") && byId("roster")) {
-    await loadRoster();
+    try {
+      await loadRoster();
+    } catch (e) {
+      console.error("Roster load failed:", e);
+      toast("Unable to load roster.", 5000);
+    }
   }
+
 } // ✅ THIS CLOSES initApp
 
 // ✅ Keep this at top-level (not nested)
