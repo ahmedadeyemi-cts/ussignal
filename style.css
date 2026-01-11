@@ -319,3 +319,86 @@ body {
 .modal-card {
   background: var(--panel);
 }
+/* =========================
+   Roster Add User Modal
+========================= */
+
+.roster-modal {
+  padding: 4px 2px 0;
+}
+
+.roster-form {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.field label .optional {
+  font-weight: 400;
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.field input,
+.field select {
+  height: 38px;
+  padding: 0 12px;
+  font-size: 14px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.field input:focus,
+.field select:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.helper-text {
+  margin-top: 14px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+/* =========================
+   Modal polish
+========================= */
+
+.modal-card {
+  max-width: 420px;
+  width: 100%;
+  border-radius: 14px;
+  padding: 20px 22px 18px;
+}
+
+.modal-head h3 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.modal-actions {
+  margin-top: 18px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.modal-actions .primary {
+  min-width: 88px;
+}
