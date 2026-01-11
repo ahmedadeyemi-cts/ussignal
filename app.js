@@ -19,13 +19,6 @@
 // SAME ORIGIN — required for Pages Functions + Access
 const API_BASE = "https://api.onenecklab.com";
 
-export async function fetchAuth(path, options = {}) {
-  return fetch(`${API_BASE}${path}`, {
-    ...options,
-    credentials: "include"
-  });
-}
-
 
 /* =========================
  * Departments
