@@ -26,8 +26,18 @@
     </div>
   </div>
 
-  <!-- Controls MUST exist for app.js -->
+  <!-- Right-side controls -->
   <div class="controls">
+
+    <!-- Theme Toggle -->
+    <button id="themeToggle" class="ghost" title="Toggle Light/Dark Mode">
+      🌙
+    </button>
+
+    <!-- Role Badge (set by app.js AFTER initApp) -->
+    <span id="roleBadge" class="role-badge" aria-label="User Role"></span>
+
+    <!-- Department Filter -->
     <select id="deptFilter" aria-label="Department Filter">
       <option value="all">All Departments</option>
       <option value="enterprise_network">Enterprise Network</option>
@@ -35,6 +45,7 @@
       <option value="system_storage">System & Storage</option>
     </select>
 
+    <!-- Actions -->
     <button id="saveAllBtn" class="primary">Save</button>
     <button id="revertBtn" class="ghost">Revert</button>
     <button id="notifyBtn" class="ghost">Notify</button>
@@ -44,14 +55,47 @@
 </header>
 
 <!-- =========================
-     TABS (wireTabs depends on this)
+     TABS
 ========================= -->
 <nav class="tabs" role="tablist">
-  <button class="tab active" data-tab="scheduleTab" role="tab">Schedule</button>
-  <button class="tab" data-tab="timelineTab" role="tab">Timeline</button>
-  <button class="tab" data-tab="rosterTab" role="tab">Roster</button>
-  <button class="tab" data-tab="autogenTab" role="tab">Auto-Generate</button>
-  <button class="tab" data-tab="auditTab" role="tab">Audit</button>
+
+  <button class="tab active"
+          data-tab="scheduleTab"
+          role="tab"
+          title="View and edit on-call assignments">
+    Schedule
+  </button>
+
+  <button class="tab"
+          data-tab="timelineTab"
+          role="tab"
+          title="Visual weekly timeline">
+    Timeline
+  </button>
+
+  <button class="tab"
+          data-tab="rosterTab"
+          data-requires="admin"
+          role="tab"
+          title="Admin only: manage on-call rotation roster">
+    Roster
+  </button>
+
+  <button class="tab"
+          data-tab="autogenTab"
+          data-requires="admin"
+          role="tab"
+          title="Admin only: auto-generate schedules">
+    Auto-Generate
+  </button>
+
+  <button class="tab"
+          data-tab="auditTab"
+          data-requires="admin"
+          role="tab"
+          title="Admin only: view audit logs">
+    Audit
+  </button>
 </nav>
 
 <!-- =========================
@@ -107,6 +151,19 @@
       <button id="auditRefreshBtn" class="ghost">Refresh</button>
     </div>
     <div id="audit"></div>
+  </section>
+
+  <!-- Access Denied Panel -->
+  <section id="accessDeniedTab" class="panel" role="tabpanel">
+    <div class="access-denied">
+      <h2>Access Restricted</h2>
+      <p>
+        You do not have permission to view this section.
+      </p>
+      <p class="small subtle">
+        Contact an administrator if you believe this is an error.
+      </p>
+    </div>
   </section>
 
 </main>
