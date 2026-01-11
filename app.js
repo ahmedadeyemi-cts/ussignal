@@ -1308,6 +1308,14 @@ function formatWeekLabel(startISO) {
 /* =========================
  * Optional: expose init globally
  * ========================= */
-window.initApp = initApp;
-window.exportICS = exportICS;
-window.refreshTimeline = refreshTimeline;
+// Auto-initialize when loaded as module
+initApp({
+  admin: true,
+  role: "admin",
+  email: "admin@ussignal.com",
+  departments: [
+    "enterprise_network",
+    "collaboration",
+    "system_storage"
+  ]
+});
