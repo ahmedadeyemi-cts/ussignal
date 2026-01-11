@@ -1,7 +1,8 @@
+// functions/api/admin/oncall.js
 export async function onRequest({ request }) {
-  const accessJWT = request.headers.get("cf-access-jwt-assertion");
+  const jwt = request.headers.get("cf-access-jwt-assertion");
 
-  if (!accessJWT) {
+  if (!jwt) {
     return new Response("Unauthorized", { status: 401 });
   }
 
