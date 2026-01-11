@@ -294,9 +294,9 @@ function wireModal() {
   if (close) close.onclick = hideModal;
   if (cancel) cancel.onclick = hideModal;
 
-  modal.onclick = (e) => {
-    if (e.target === modal) hideModal();
-  };
+  mmodal.addEventListener("mousedown", (e) => {
+  if (e.target.id === "modal") hideModal();
+});
 }
 
 function showModal(title, bodyHtml, okText = "OK", onOk = null, cancelText = "Cancel") {
@@ -346,7 +346,9 @@ if (saveAddBtn) {
   }
 
   modal.classList.remove("hidden");
+  modal.classList.add("modal-open");
   modal.setAttribute("aria-hidden", "false");
+  modal.focus();
 }
 
 function confirmModal(title, bodyText, onOk) {
@@ -362,8 +364,10 @@ function confirmModal(title, bodyText, onOk) {
 function hideModal() {
   const modal = byId("modal");
   if (!modal) return;
+  modal.classList.remove("modal-open");
   modal.classList.add("hidden");
   modal.setAttribute("aria-hidden", "true");
+
 }
 
 /* =========================
