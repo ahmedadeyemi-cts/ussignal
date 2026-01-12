@@ -1033,16 +1033,9 @@ async function loadScheduleAdmin(el) {
   applyRBACToUI();
 }
 
-
-
-}
-
 function renderScheduleAdmin(el) {
   const canEdit = roleAtLeast(APP_STATE.role, "editor");
   const isAdmin = roleAtLeast(APP_STATE.role, "admin");
-  if (roleAtLeast(APP_STATE.role, "admin")) {
-  restrictToAllowedDepts = false;
-}
 
   el.innerHTML = "";
   if (!APP_STATE.draftSchedule?.entries?.length) {
@@ -1058,21 +1051,18 @@ function renderScheduleAdmin(el) {
   const restrictToAllowedDepts = roleAtLeast(APP_STATE.role, "admin") ? false : true;
 
  const entries = (APP_STATE.draftSchedule?.entries || []).map(e => {
-  if (deptFilter === "all") {
-    return e;
-  }
-
-  if (!DEPT_KEYS.includes(deptFilter)) {
-    return e;
-  }
+  if (deptFilter === "all") return e;
+  if (!DEPT_KEYS.includes(deptFilter)) return e;
 
   const only = e.departments?.[deptFilter];
-return {
-  ...e,
-  departments: only
-    ? { [deptFilter]: only }
-    : { [deptFilter]: { name: "", email: "", phone: "" } }
-};
+  return {
+    ...e,
+    departments: only
+      ? { [deptFilter]: only }
+      : { [deptFilter]: { name: "", email: "", phone: "" } }
+  };
+});
+
 
 
   entries.forEach(e => {
