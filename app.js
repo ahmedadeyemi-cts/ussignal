@@ -1041,6 +1041,9 @@ const data = normalizeScheduleResponse(raw);
 function renderScheduleAdmin(el) {
   const canEdit = roleAtLeast(APP_STATE.role, "editor");
   const isAdmin = roleAtLeast(APP_STATE.role, "admin");
+  if (roleAtLeast(APP_STATE.role, "admin")) {
+  restrictToAllowedDepts = false;
+}
 
   el.innerHTML = "";
   if (!APP_STATE.draftSchedule?.entries?.length) {
@@ -1065,11 +1068,13 @@ function renderScheduleAdmin(el) {
   }
 
   const only = e.departments?.[deptFilter];
-  return {
-    ...e,
-    departments: only ? { [deptFilter]: only } : {}
-  };
-});
+return {
+  ...e,
+  departments: only
+    ? { [deptFilter]: only }
+    : { [deptFilter]: { name: "", email: "", phone: "" } }
+};
+
 
   entries.forEach(e => {
     const editing = APP_STATE.editingEntryIds.has(String(e.id));
