@@ -327,7 +327,26 @@ function toggleTheme() {
   applyTheme(isDark ? "light" : "dark");
 }
 
+function renderRosterSelect(entryId, dep, selectedEmail) {
+  const users = APP_STATE.roster?.[dep] || [];
 
+  return `
+    <select
+      data-entry="${escapeHtml(entryId)}"
+      data-dept="${escapeHtml(dep)}"
+      data-field="email"
+      class="roster-select"
+    >
+      <option value="">— Select from roster —</option>
+      ${users.map(u => `
+        <option value="${escapeHtml(u.email)}"
+          ${u.email === selectedEmail ? "selected" : ""}>
+          ${escapeHtml(u.name)} (${escapeHtml(u.email)})
+        </option>
+      `).join("")}
+    </select>
+  `;
+}
 /* =========================
  * Modal Helpers
  * ========================= */
@@ -912,29 +931,25 @@ function renderDeptBlocks(depts, editable, entryId, restrictToAllowedDepts) {
         `;
       }
 
-      return `
-        <div class="entry">
-          <h4>${escapeHtml(label)}</h4>
+     return `
+  <div class="entry">
+    <h4>${escapeHtml(label)}</h4>
 
-          <div class="inline-row">
-            <label>Name</label>
-            <input data-entry="${escapeHtml(entryId)}" data-dept="${escapeHtml(dep)}" data-field="name"
-                   value="${escapeHtml(p.name || "")}" />
-          </div>
+    <div class="inline-row">
+      <label>User</label>
+      ${renderRosterSelect(entryId, dep, p.email)}
+    </div>
 
-          <div class="inline-row">
-            <label>Email</label>
-            <input data-entry="${escapeHtml(entryId)}" data-dept="${escapeHtml(dep)}" data-field="email"
-                   value="${escapeHtml(p.email || "")}" />
-          </div>
+    <div class="small subtle">
+      Name & phone auto-filled from roster
+    </div>
 
-          <div class="inline-row">
-            <label>Phone</label>
-            <input data-entry="${escapeHtml(entryId)}" data-dept="${escapeHtml(dep)}" data-field="phone"
-                   value="${escapeHtml(p.phone || "")}" />
-          </div>
-        </div>
-      `;
+    <div class="small">
+      <b>${escapeHtml(p.name || "")}</b><br/>
+      ${escapeHtml(p.phone || "")}
+    </div>
+  </div>
+`;
     })
     .join("");
 }
@@ -1133,6 +1148,32 @@ function renderScheduleAdmin(el) {
 function deepClone(obj) {
   return JSON.parse(JSON.stringify(obj));
 }
+el.querySelectorAll("select[data-field='email']").forEach(sel => {
+  sel.onchange = () => {
+    HAS_UNSAVED_CHANGES = true;
+
+    const entryId = sel.getAttribute("data-entry");
+    const dep = sel.getAttribute("data-dept");
+    const email = sel.value;
+
+    const user = APP_STATE.roster?.[dep]?.find(u => u.email === email);
+    if (!user) return;
+
+    const entry = (APP_STATE.draftSchedule?.entries || [])
+      .find(e => String(e.id) === String(entryId));
+    if (!entry) return;
+
+    if (!entry.departments) entry.departments = {};
+    entry.departments[dep] = {
+      name: user.name,
+      email: user.email,
+      phone: user.phone || ""
+    };
+
+    refreshTimeline();
+    updateSaveState();
+  };
+});
 
 /* =========================
  * Save / Notify / Export / ICS
