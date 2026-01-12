@@ -1002,7 +1002,9 @@ function renderScheduleAdmin(el) {
   const restrictToAllowedDepts = roleAtLeast(APP_STATE.role, "admin") ? false : true;
 
   const entries = (APP_STATE.draftSchedule?.entries || []).map(e => {
-    if (deptFilter === "all") return e;
+    if (deptFilter === "all" || !DEPT_KEYS.includes(deptFilter)) {
+  return e;
+}
     const only = e.departments?.[deptFilter];
     return { ...e, departments: only ? { [deptFilter]: only } : {} };
   });
