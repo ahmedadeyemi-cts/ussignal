@@ -1013,18 +1013,15 @@ async function loadScheduleAdmin(el) {
   // PROTECTED: same-origin + credentials include
   const res = await fetchAuth(`/api/admin/oncall`, { method: "GET" });
   if (!res.ok) throw new Error(await res.text());
+
   const raw = await res.json();
 
-// 🔐 Normalize backend response (supports old + new formats)
-let raw;
-try {
-  raw = await res.json();
-} catch {
-  raw = await res.text();
-}
-
-const data = normalizeScheduleResponse(raw);
-
+  // 🔐 Normalize backend response (supports old + new formats)
+  const data =
+    raw?.entries ? raw :
+    raw?.schedule?.entries ? raw.schedule :
+    raw?.data?.entries ? raw.data :
+    { entries: [] };
 
   APP_STATE.scheduleFull = data;
   APP_STATE.draftSchedule = deepClone(data);
@@ -1034,6 +1031,8 @@ const data = normalizeScheduleResponse(raw);
   renderScheduleAdmin(el);
   refreshTimeline();
   applyRBACToUI();
+}
+
 
 
 }
