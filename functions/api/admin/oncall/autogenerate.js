@@ -1,13 +1,46 @@
-export async function onRequestPost({ request, env }) {
-  const jwt = request.headers.get("cf-access-jwt-assertion");
-  if (!jwt) return new Response("Unauthorized", { status: 401 });
+// ----------------------------
+// Rotation state per department
+// ----------------------------
+const rotationIndex = {};
+for (const dept of Object.keys(roster)) {
+  rotationIndex[dept] = Number(seedIndex) || 0;
+}
 
-  const body = await request.json();
+// ----------------------------
+// Build weekly entries
+// ----------------------------
+const entries = [];
+let cursor = nextFriday(toDate(startYMD));
+const endLimit = toDate(endYMD);
+let entryId = 1;
 
-  // Placeholder logic for now
-  // Later you’ll generate real entries
-  return new Response(
-    JSON.stringify({ ok: true, generated: true }),
-    { headers: { "content-type": "application/json" } }
-  );
+while (cursor <= endLimit) {
+  const start = new Date(cursor);
+  const end = endFriday(start);
+
+  const departments = {};
+
+  for (const [dept, users] of Object.entries(roster)) {
+    if (!Array.isArray(users) || !users.length) continue;
+
+    const idx = rotationIndex[dept] % users.length;
+    const user = users[idx];
+
+    departments[dept] = {
+      name: user.name || "",
+      email: user.email || "",
+      phone: user.phone || ""
+    };
+
+    rotationIndex[dept]++; // ✅ advance per department
+  }
+
+  entries.push({
+    id: entryId++,
+    startISO: toISO(start),
+    endISO: toISO(end),
+    departments
+  });
+
+  cursor = addDays(cursor, 7);
 }
