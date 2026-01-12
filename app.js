@@ -1017,11 +1017,7 @@ async function loadScheduleAdmin(el) {
   const raw = await res.json();
 
   // 🔐 Normalize backend response (supports old + new formats)
-  const data =
-    raw?.entries ? raw :
-    raw?.schedule?.entries ? raw.schedule :
-    raw?.data?.entries ? raw.data :
-    { entries: [] };
+  const data = normalizeScheduleResponse(raw);
 
   APP_STATE.scheduleFull = data;
   APP_STATE.draftSchedule = deepClone(data);
