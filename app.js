@@ -1024,24 +1024,22 @@ function normalizeScheduleResponse(raw) {
  * ========================= */
 
 async function loadScheduleAdmin(el) {
-  // PROTECTED: same-origin + credentials include
   const res = await fetchAuth(`/api/admin/oncall`, { method: "GET" });
   if (!res.ok) throw new Error(await res.text());
 
   const raw = await res.json();
+  console.log("[oncall] raw admin/oncall response:", raw);
 
-  // 🔐 Normalize backend response (supports old + new formats)
   const data = normalizeScheduleResponse(raw);
+  console.log(
+    "[oncall] normalized entries count:",
+    data.entries?.length,
+    data
+  );
 
   APP_STATE.scheduleFull = data;
   APP_STATE.draftSchedule = deepClone(data);
-
   APP_STATE.editingEntryIds.clear();
-  const raw = await res.json();
-console.log("[oncall] raw admin/oncall response:", raw);
-
-const data = normalizeScheduleResponse(raw);
-console.log("[oncall] normalized entries count:", data.entries?.length, data);
 
   renderScheduleAdmin(el);
   refreshTimeline();
