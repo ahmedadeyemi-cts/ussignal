@@ -1001,13 +1001,21 @@ function renderScheduleAdmin(el) {
   const deptFilter = String(APP_STATE.dept || "all").toLowerCase();
   const restrictToAllowedDepts = roleAtLeast(APP_STATE.role, "admin") ? false : true;
 
-  const entries = (APP_STATE.draftSchedule?.entries || []).map(e => {
-    if (!DEPT_KEYS.includes(deptFilter)) {
-  return e; // treat unknown values (All Departments) as ALL
-      }
-    const only = e.departments?.[deptFilter];
-    return { ...e, departments: only ? { [deptFilter]: only } : {} };
-  });
+ const entries = (APP_STATE.draftSchedule?.entries || []).map(e => {
+  if (deptFilter === "all") {
+    return e;
+  }
+
+  if (!DEPT_KEYS.includes(deptFilter)) {
+    return e;
+  }
+
+  const only = e.departments?.[deptFilter];
+  return {
+    ...e,
+    departments: only ? { [deptFilter]: only } : {}
+  };
+});
 
   entries.forEach(e => {
     const editing = APP_STATE.editingEntryIds.has(String(e.id));
