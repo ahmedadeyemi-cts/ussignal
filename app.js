@@ -176,6 +176,7 @@ APP_STATE.allowedDepartments = Array.isArray(ctx?.departments)
   ));
 
   onClick("saveAllBtn", saveAllChanges);
+  onClick("addScheduleBtn", addScheduleEntryModal);
 
 
   onClick("rosterReloadBtn", loadRoster);
@@ -368,6 +369,76 @@ function hideModal() {
   modal.classList.add("hidden");
   modal.setAttribute("aria-hidden", "true");
 
+}
+/* =========================
+ * Schedule Creation (Manual)
+ * ========================= */
+
+function addScheduleEntryModal() {
+  showModal(
+    "Add Schedule Entry",
+    `
+      <div class="form-grid">
+        <div class="field">
+          <label>Start Date (Friday)</label>
+          <input id="newScheduleStart" type="date" />
+        </div>
+
+        <div class="field">
+          <label>End Date (Friday)</label>
+          <input id="newScheduleEnd" type="date" />
+        </div>
+      </div>
+
+      <div class="small subtle" style="margin-top:10px">
+        Start will be set to <b>4:00 PM CST</b><br/>
+        End will be set to <b>7:00 AM CST</b><br/>
+        Duration must be exactly 7 days.
+      </div>
+    `,
+    "Add",
+    async () => {
+      const startYMD = byId("newScheduleStart")?.value;
+      const endYMD = byId("newScheduleEnd")?.value;
+
+      if (!startYMD || !endYMD) {
+        throw new Error("Start and End dates are required.");
+      }
+
+      const startISO = `${startYMD}T16:00:00`;
+      const endISO = `${endYMD}T07:00:00`;
+
+      const err = validateOnCallWindow(startISO, endISO);
+      if (err) throw new Error(err);
+
+      if (!APP_STATE.draftSchedule) {
+        APP_STATE.draftSchedule = { entries: [] };
+      }
+
+      const newEntry = {
+        id: crypto.randomUUID(),
+        startISO,
+        endISO,
+        departments: Object.fromEntries(
+          DEPT_KEYS.map(dep => [
+            dep,
+            { name: "", email: "", phone: "" }
+          ])
+        )
+      };
+
+      APP_STATE.draftSchedule.entries.push(newEntry);
+      HAS_UNSAVED_CHANGES = true;
+
+      renderScheduleAdmin(byId("schedule"));
+      refreshTimeline();
+      updateSaveState();
+
+      toast("Schedule entry added (not saved yet).");
+      return true;
+    },
+    "Cancel"
+  );
 }
 
 /* =========================
