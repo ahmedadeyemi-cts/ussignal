@@ -248,13 +248,9 @@ APP_STATE.allowedDepartments = Array.isArray(ctx?.departments)
   // =========================
   // LOAD DATA (NON-BLOCKING)
   // =========================
-const scheduleEl =
-  byId("schedulePanel") ||
-  byId("scheduleTab") ||
-  byId("schedule");
-
+const scheduleEl = byId("schedule");
 if (!scheduleEl) {
-  console.error("Schedule container not found in DOM");
+  console.error("Schedule container (#schedule) not found");
 } else {
   await loadScheduleAdmin(scheduleEl);
 }
@@ -262,6 +258,7 @@ if (!scheduleEl) {
 if (byId("roster")) {
   try {
     await loadRoster();
+    await loadScheduleAdmin(byId("schedule")); // 🔴 REQUIRED
   } catch (e) {
     console.error("Roster load failed:", e);
     toast("Unable to load roster.", 5000);
@@ -1048,18 +1045,8 @@ function renderScheduleAdmin(el) {
   const deptFilter = String(APP_STATE.dept || "all").toLowerCase();
   const restrictToAllowedDepts = roleAtLeast(APP_STATE.role, "admin") ? false : true;
 
- const entries = (APP_STATE.draftSchedule?.entries || []).map(e => {
-  if (deptFilter === "all") return e;
-  if (!DEPT_KEYS.includes(deptFilter)) return e;
+ const entries = APP_STATE.draftSchedule?.entries || [];
 
-  const only = e.departments?.[deptFilter];
-  return {
-    ...e,
-    departments: only
-      ? { [deptFilter]: only }
-      : { [deptFilter]: { name: "", email: "", phone: "" } }
-  };
-});
 
 
 
