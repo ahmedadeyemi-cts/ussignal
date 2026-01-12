@@ -971,10 +971,18 @@ async function loadScheduleAdmin(el) {
   // PROTECTED: same-origin + credentials include
   const res = await fetchAuth(`/api/admin/oncall`, { method: "GET" });
   if (!res.ok) throw new Error(await res.text());
-  const data = await res.json();
+  const raw = await res.json();
+
+// 🔐 Normalize backend response (supports old + new formats)
+const data =
+  raw?.entries ? raw :
+  raw?.schedule?.entries ? raw.schedule :
+  raw?.data?.entries ? raw.data :
+  { entries: [] };
 
   APP_STATE.scheduleFull = data;
   APP_STATE.draftSchedule = deepClone(data);
+
   APP_STATE.editingEntryIds.clear();
 
   renderScheduleAdmin(el);
