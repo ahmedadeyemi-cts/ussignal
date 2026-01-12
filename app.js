@@ -222,7 +222,7 @@ APP_STATE.allowedDepartments = Array.isArray(ctx?.departments)
   ));
 
   onClick("saveAllBtn", saveAllChanges);
-  // onClick("addScheduleBtn", addScheduleEntryModal);
+  onClick("addScheduleBtn", addScheduleEntryModal);
 
 
   onClick("rosterReloadBtn", loadRoster);
