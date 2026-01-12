@@ -5,64 +5,86 @@
   <title>US Signal | On-Call Administration</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <!-- Favicon -->
   <link rel="icon" href="./ussignal.jpg" type="image/jpeg" />
-
-  <!-- Core Styles -->
   <link rel="stylesheet" href="style.css" />
 
-  <!-- Modal Enhancements (safe to inline) -->
+  <!-- =========================
+       ENTERPRISE UX ENHANCEMENTS
+  ========================= -->
   <style>
-    /* ===== Modal Animation ===== */
-    .modal {
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 160ms ease;
+    /* ===== MODAL ===== */
+    .modal { opacity:0; pointer-events:none; transition:opacity 160ms ease; }
+    .modal.modal-open { opacity:1; pointer-events:auto; }
+    .modal-card { transform:translateY(12px) scale(.98); opacity:0; transition:all 180ms ease; }
+    .modal.modal-open .modal-card { transform:none; opacity:1; }
+
+    /* ===== CURRENT ON-CALL BADGE ===== */
+    .schedule-card.current-oncall {
+      border-left: 6px solid #16a34a;
+      box-shadow: 0 0 0 1px rgba(22,163,74,.35);
+      position: relative;
     }
-    .modal.modal-open {
-      opacity: 1;
-      pointer-events: auto;
-    }
-    .modal-card {
-      transform: translateY(12px) scale(0.98);
-      opacity: 0;
-      transition: transform 180ms ease, opacity 180ms ease;
-    }
-    .modal.modal-open .modal-card {
-      transform: translateY(0) scale(1);
-      opacity: 1;
+    .schedule-card.current-oncall::before {
+      content: "CURRENT";
+      position: absolute;
+      top: 10px;
+      right: 12px;
+      background: #16a34a;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 8px;
+      border-radius: 999px;
+      letter-spacing: .5px;
     }
 
-    /* ===== Inline Validation ===== */
-    .field {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
+    /* ===== WHO'S ON CALL LIVE ===== */
+    .current-oncall-live {
+      border-left: 6px solid #0ea5e9;
+      background: linear-gradient(90deg, rgba(14,165,233,.08), transparent);
     }
-    .field-error input {
-      border-color: #dc2626;
+
+    /* ===== HARD LOCK PAST WEEKS ===== */
+    .schedule-card.past-week {
+      opacity: .55;
+      filter: grayscale(.15);
     }
-    .field-success input {
-      border-color: #16a34a;
+    .schedule-card.past-week input,
+    .schedule-card.past-week button.primary {
+      pointer-events: none;
+      opacity: .6;
+      cursor: not-allowed;
     }
-    .hint {
-      font-size: 12px;
+    .schedule-card.past-week .card-head::after {
+      content: "PAST WEEK (LOCKED)";
+      display: block;
+      font-size: 11px;
+      color: #9ca3af;
+      margin-top: 4px;
+    }
+
+    /* ===== INLINE EDIT FOCUS ===== */
+    .entry input:focus {
+      outline: 2px solid #2563eb;
+      outline-offset: 1px;
+    }
+
+    /* ===== LIVE TAB ===== */
+    #currentOnCall .schedule-card {
+      margin-bottom: 16px;
+    }
+
+    .small.subtle {
       color: #6b7280;
-    }
-    .hint.error {
-      color: #dc2626;
     }
   </style>
 </head>
 
 <body class="light">
 
-<!-- =========================
-     TOP BAR
-========================= -->
 <header class="topbar">
   <div class="brand">
-    <img src="ussignal.jpg" alt="US Signal" class="logo" />
+    <img src="ussignal.jpg" class="logo" />
     <div>
       <div class="brand-title">US Signal</div>
       <div class="brand-sub">On-Call Administration</div>
@@ -70,10 +92,10 @@
   </div>
 
   <div class="controls">
-    <button id="themeToggle" class="ghost" title="Toggle Light/Dark Mode">🌙</button>
-    <span id="roleBadge" class="role-badge" aria-label="User Role"></span>
+    <button id="themeToggle" class="ghost">🌙</button>
+    <span id="roleBadge" class="role-badge"></span>
 
-    <select id="deptFilter" aria-label="Department Filter">
+    <select id="deptFilter">
       <option value="all">All Departments</option>
       <option value="enterprise_network">Enterprise Network</option>
       <option value="collaboration">Collaboration</option>
@@ -91,38 +113,43 @@
 <!-- =========================
      TABS
 ========================= -->
-<nav class="tabs" role="tablist">
-  <button class="tab active" data-tab="scheduleTab" role="tab">Schedule</button>
-  <button class="tab" data-tab="timelineTab" role="tab">Timeline</button>
-  <button class="tab" data-tab="rosterTab" data-requires="admin" role="tab">Roster</button>
-  <button class="tab" data-tab="autogenTab" data-requires="admin" role="tab">Auto-Generate</button>
-  <button class="tab" data-tab="auditTab" data-requires="admin" role="tab">Audit</button>
+<nav class="tabs">
+  <button class="tab active" data-tab="scheduleTab">Schedule</button>
+  <button class="tab" data-tab="currentTab">Who’s On Call Now</button>
+  <button class="tab" data-tab="timelineTab">Timeline</button>
+  <button class="tab" data-tab="rosterTab" data-requires="admin">Roster</button>
+  <button class="tab" data-tab="autogenTab" data-requires="admin">Auto-Generate</button>
+  <button class="tab" data-tab="auditTab" data-requires="admin">Audit</button>
 </nav>
 
-<!-- =========================
-     MAIN CONTENT
-========================= -->
 <main class="container">
 
-  <section id="scheduleTab" class="panel active" role="tabpanel">
-
-  <div class="panel-head">
-    <h2>On-Call Schedule</h2>
-    <div>
+  <!-- SCHEDULE -->
+  <section id="scheduleTab" class="panel active">
+    <div class="panel-head">
+      <h2>On-Call Schedule</h2>
       <button id="addScheduleBtn" class="primary">Add Schedule</button>
     </div>
-  </div>
+    <div id="schedule"></div>
+  </section>
 
-  <div id="schedule"></div>
-</section>
+  <!-- WHO'S ON CALL NOW -->
+  <section id="currentTab" class="panel">
+    <div class="panel-head">
+      <h2>Who’s On Call Now</h2>
+      <div class="small subtle">Live · Inline editable · Auto-refreshing</div>
+    </div>
+    <div id="currentOnCall"></div>
+  </section>
 
-
-  <section id="timelineTab" class="panel" role="tabpanel">
+  <!-- TIMELINE -->
+  <section id="timelineTab" class="panel">
     <h2>Weekly Timeline</h2>
     <div id="timeline"></div>
   </section>
 
-  <section id="rosterTab" class="panel" role="tabpanel">
+  <!-- ROSTER -->
+  <section id="rosterTab" class="panel">
     <div class="panel-head">
       <h2>Roster Management</h2>
       <div>
@@ -134,23 +161,19 @@
     <div id="roster"></div>
   </section>
 
-  <section id="autogenTab" class="panel" role="tabpanel">
+  <!-- AUTO-GEN -->
+  <section id="autogenTab" class="panel">
     <h2>Auto-Generate Schedule</h2>
     <div class="form-row">
-      <label for="autogenStart">Start</label>
-      <input type="date" id="autogenStart" />
-
-      <label for="autogenEnd">End</label>
-      <input type="date" id="autogenEnd" />
-
-      <label for="autogenSeed">Seed</label>
-      <input type="number" id="autogenSeed" value="0" />
-
+      <label>Start</label><input type="date" id="autogenStart" />
+      <label>End</label><input type="date" id="autogenEnd" />
+      <label>Seed</label><input type="number" id="autogenSeed" value="0" />
       <button id="runAutogenBtn" class="primary">Run</button>
     </div>
   </section>
 
-  <section id="auditTab" class="panel" role="tabpanel">
+  <!-- AUDIT -->
+  <section id="auditTab" class="panel">
     <div class="panel-head">
       <h2>Audit Log</h2>
       <button id="auditRefreshBtn" class="ghost">Refresh</button>
@@ -158,33 +181,23 @@
     <div id="audit"></div>
   </section>
 
-  <section id="accessDeniedTab" class="panel" role="tabpanel">
+  <section id="accessDeniedTab" class="panel">
     <div class="access-denied">
       <h2>Access Restricted</h2>
-      <p>You do not have permission to view this section.</p>
-      <p class="small subtle">Contact an administrator if you believe this is an error.</p>
+      <p>Contact an administrator if you believe this is an error.</p>
     </div>
   </section>
 
 </main>
 
-<!-- =========================
-     MODAL (ENHANCED)
-========================= -->
-<div id="modal"
-     class="modal hidden"
-     role="dialog"
-     aria-modal="true"
-     tabindex="-1">
-
-  <div class="modal-card modal-card-animate">
+<!-- MODAL -->
+<div id="modal" class="modal hidden" role="dialog">
+  <div class="modal-card">
     <div class="modal-head">
       <h3 id="modalTitle"></h3>
-      <button id="modalClose" aria-label="Close">✕</button>
+      <button id="modalClose">✕</button>
     </div>
-
-    <div id="modalBody" class="modal-body"></div>
-
+    <div id="modalBody"></div>
     <div class="modal-actions">
       <button id="modalCancel" class="ghost">Cancel</button>
       <button id="modalOk" class="primary">Save</button>
@@ -193,20 +206,12 @@
   </div>
 </div>
 
-<!-- Toast -->
-<div id="toast" class="toast hidden" role="status"></div>
+<div id="toast" class="toast hidden"></div>
 
-<!-- =========================
-     APP SCRIPT
-========================= -->
 <script src="/app.js" defer></script>
 <script>
   window.addEventListener("DOMContentLoaded", () => {
-    if (typeof initApp === "function") {
-      initApp(window.__CTX__ || {});
-    } else {
-      console.error("initApp() not found — app.js failed to load.");
-    }
+    initApp(window.__CTX__ || {});
   });
 </script>
 
