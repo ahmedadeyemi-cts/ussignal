@@ -287,7 +287,7 @@ async function reloadSchedule() {
   if (!el) return;
 
   if (APP_STATE.admin || roleAtLeast(APP_STATE.role, "editor")) {
-    await loadScheduleAdmin(el);   // ✅ ALWAYS reload from KV
+    await loadScheduleAdmin(el);  // ✅ fetch from KV, don’t just render
   } else {
     await loadSchedulePublic(el);
   }
@@ -979,29 +979,37 @@ function renderDeptBlocks(depts, editable, entryId, restrictToAllowedDepts) {
  * Normalized Schedule
  * ========================= */
 function normalizeScheduleResponse(raw) {
-  // If Worker/KV returned a string
+  // 1) If the whole response is a string, parse it
   if (typeof raw === "string") {
     try { raw = JSON.parse(raw); } catch { raw = {}; }
   }
 
-  // Unwrap common containers
-  const container =
+  // 2) Unwrap common containers
+  let container =
     raw?.schedule ??
     raw?.data ??
-    raw?.value ??
+    raw?.value ??   // NOTE: KV wrappers often use .value as STRING
     raw;
 
+  // 3) If the container itself is a string, parse it (THIS IS THE KEY FIX)
+  if (typeof container === "string") {
+    try { container = JSON.parse(container); } catch { container = {}; }
+  }
+
+  // 4) Pull entries from common shapes
   let entries =
     container?.entries ??
     container?.items ??
+    container?.schedule?.entries ??
+    container?.value ??   // sometimes nested again
     [];
 
-  // Entries sometimes stored as JSON string
+  // 5) If entries is a string, parse it
   if (typeof entries === "string") {
     try { entries = JSON.parse(entries); } catch { entries = []; }
   }
 
-  // Convert object map → array
+  // 6) Convert object map → array
   if (entries && !Array.isArray(entries) && typeof entries === "object") {
     entries = Object.values(entries);
   }
@@ -1010,7 +1018,6 @@ function normalizeScheduleResponse(raw) {
 
   return { entries };
 }
-
 
 /* =========================
  * Admin Schedule (Editor/Admin)
@@ -1030,6 +1037,11 @@ async function loadScheduleAdmin(el) {
   APP_STATE.draftSchedule = deepClone(data);
 
   APP_STATE.editingEntryIds.clear();
+  const raw = await res.json();
+console.log("[oncall] raw admin/oncall response:", raw);
+
+const data = normalizeScheduleResponse(raw);
+console.log("[oncall] normalized entries count:", data.entries?.length, data);
 
   renderScheduleAdmin(el);
   refreshTimeline();
