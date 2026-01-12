@@ -416,4 +416,97 @@ body {
   font-weight: 600;
   margin-left: 8px;
 }
+/* =========================
+   WHO’S ON CALL NOW
+========================= */
 
+.current-oncall-wrap {
+  margin-top: 12px;
+}
+
+.schedule-card.current-oncall {
+  border: 2px solid #2563eb;
+  background: linear-gradient(
+    180deg,
+    rgba(37,99,235,0.08),
+    rgba(37,99,235,0.03)
+  );
+  box-shadow: 0 0 0 1px rgba(37,99,235,0.25);
+}
+
+.schedule-card.current-oncall .card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.schedule-card.current-oncall .card-title {
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.schedule-card.current-oncall .small {
+  color: #1e40af;
+  font-weight: 600;
+}
+
+/* LIVE badge */
+.live-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #16a34a;
+}
+
+.pulse-dot {
+  width: 10px;
+  height: 10px;
+  background: #16a34a;
+  border-radius: 50%;
+  position: relative;
+}
+
+.pulse-dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(22,163,74,0.5);
+  animation: pulse 1.5s infinite ease-out;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+/* Inline edit clarity */
+.current-oncall .entry input {
+  background: #ffffff;
+  border: 1px solid #c7d2fe;
+}
+
+.current-oncall .entry input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37,99,235,0.2);
+}
+
+/* Dept blocks */
+.current-oncall .entry {
+  border-left: 4px solid transparent;
+  padding-left: 12px;
+}
+
+.current-oncall .entry:nth-child(1) { border-color: #3b82f6; }
+.current-oncall .entry:nth-child(2) { border-color: #22c55e; }
+.current-oncall .entry:nth-child(3) { border-color: #eab308; }
+
+/* Locked past weeks visual guard (future-proof) */
+.schedule-card.locked {
+  opacity: 0.6;
+  pointer-events: none;
+  filter: grayscale(0.3);
+}
