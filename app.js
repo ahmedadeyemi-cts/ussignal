@@ -39,9 +39,54 @@ const DEPT_KEYS = Object.keys(DEPT_LABELS);
  * UI displays in fixed CST (UTC-6) year-round and labels "CST".
  * NOTE: Using fixed UTC-6 means this does NOT become CDT in summer (per your requirement).
  */
+
 const SOURCE_TZ = "America/Chicago";
 const DISPLAY_TZ_FIXED_CST = "Etc/GMT+6";
 
+/* =========================
+ * SETTING HOLIDAYS
+  ========================= */
+const US_HOLIDAYS = {
+  "01-01": "New Year’s Day",
+  "07-04": "Independence Day",
+  "11-11": "Veterans Day",
+  "12-25": "Christmas Day"
+};
+
+// Dynamic holidays
+function getDynamicUSHolidays(year) {
+  return {
+    [`${year}-01-3-Mon`]: "Martin Luther King Jr. Day",
+    [`${year}-02-3-Mon`]: "Presidents’ Day",
+    [`${year}-05-last-Mon`]: "Memorial Day",
+    [`${year}-09-1-Mon`]: "Labor Day",
+    [`${year}-11-4-Thu`]: "Thanksgiving"
+  };
+}
+
+function getHolidayName(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+
+  const fixed = US_HOLIDAYS[`${m}-${d}`];
+  if (fixed) return fixed;
+
+  const day = date.getDay();
+  const week = Math.ceil(date.getDate() / 7);
+  const isLast = date.getDate() + 7 > 31;
+
+  const weekday = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][day];
+  const dynKey = `${y}-${m}-${week}-${weekday}`;
+  const lastKey = `${y}-${m}-last-${weekday}`;
+
+  const dyn = getDynamicUSHolidays(y);
+  return dyn[dynKey] || (isLast ? dyn[lastKey] : null);
+}
+/* =========================
+ * End of Holiday Set above
+ * ========================= */
+ 
 /* =========================
  * Role-Based Access Control
  * =========================
@@ -111,6 +156,7 @@ async function fetchPublic(path, opts = {}) {
   const res = await fetch(apiUrl(path), { ...opts });
   return res;
 }
+
 /* =========================
  * Init
  * ========================= */
@@ -384,9 +430,10 @@ function addScheduleEntryModal() {
           <input id="newScheduleStart" type="date" />
         </div>
 
-        <div class="field">
-          <label>End Date (Friday)</label>
-          <input id="newScheduleEnd" type="date" />
+        <div class="small subtle" style="margin-top:10px">
+          Start will be set to <b>Friday 4:00 PM CST</b><br/>
+          End will be automatically set to <b>Friday 7:00 AM CST (next week)</b><br/>
+          Duration is fixed at exactly 7 days.
         </div>
       </div>
 
@@ -399,14 +446,11 @@ function addScheduleEntryModal() {
     "Add",
     async () => {
       const startYMD = byId("newScheduleStart")?.value;
-      const endYMD = byId("newScheduleEnd")?.value;
+      if (!startYMD) {
+         throw new Error("Start date is required.");
+            }
 
-      if (!startYMD || !endYMD) {
-        throw new Error("Start and End dates are required.");
-      }
-
-      const startISO = `${startYMD}T16:00:00`;
-      const endISO = `${endYMD}T07:00:00`;
+      const { startISO, endISO } = buildOnCallWindowFromStart(startYMD);
 
       const err = validateOnCallWindow(startISO, endISO);
       if (err) throw new Error(err);
@@ -465,7 +509,7 @@ function wireTabs() {
         byId("accessDeniedTab")?.classList.add("active");
         return;
       }
-
+      if (target === "currentTab") startCurrentOnCallAutoRefresh();
       const target = tab.dataset.tab;
       byId(target)?.classList.add("active");
 
@@ -585,6 +629,31 @@ function isoToDateLocalAssumed(iso) {
   if (!parts) return new Date(NaN);
   return new Date(parts.y, parts.mo - 1, parts.d, parts.h, parts.mi, parts.s, 0);
 }
+/* =========================
+ * TIME HELPER
+ * ========================= */
+function buildOnCallWindowFromStart(startYMD) {
+  const start = new Date(`${startYMD}T16:00:00`);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 7);
+  end.setHours(7, 0, 0, 0);
+
+  return {
+    startISO: toLocalInput(start) + ":00",
+    endISO: toLocalInput(end) + ":00"
+  };
+}
+/* =========================
+ * Helper: get current on-call entry
+ * ========================= */
+function getCurrentOnCallEntry(entries) {
+  const now = new Date();
+  return (entries || []).find(e => {
+    const s = isoToDateLocalAssumed(e.startISO);
+    const en = isoToDateLocalAssumed(e.endISO);
+    return now >= s && now < en;
+  }) || null;
+}
 
 /* =========================
  * Validation
@@ -605,6 +674,15 @@ function validateOnCallWindow(startISO, endISO) {
   if (diffDays < 6.99 || diffDays > 7.01) return "On-call window must be exactly 7 days.";
 
   return null;
+}
+/* =========================
+ * CURRENT ONCALL
+ * ========================= */
+function isCurrentOnCall(entry) {
+  const now = new Date();
+  const start = isoToDateLocalAssumed(entry.startISO);
+  const end = isoToDateLocalAssumed(entry.endISO);
+  return now >= start && now < end;
 }
 
 /* =========================
@@ -751,6 +829,54 @@ function renderScheduleReadOnly(el, entries) {
 }
 
 /* =========================
+ * Renderer for “Who’s On Call Now”
+ * ========================= */
+function renderCurrentOnCall() {
+  const el = byId("currentOnCall");
+  if (!el) return;
+
+  const source =
+    APP_STATE.draftSchedule ||
+    APP_STATE.scheduleFull ||
+    APP_STATE.schedulePublic;
+
+  if (!source || !source.entries?.length) {
+    el.innerHTML = `<div class="subtle">No schedule loaded.</div>`;
+    return;
+  }
+
+  const entry = getCurrentOnCallEntry(source.entries);
+
+  if (!entry) {
+    el.innerHTML = `<div class="subtle">No one is currently on call.</div>`;
+    return;
+  }
+
+  el.innerHTML = `
+    <div class="schedule-card current-oncall">
+      <div class="card-head">
+        <div class="card-title">
+          ${escapeHtml(formatCSTFromChicagoLocal(entry.startISO))}
+          →
+          ${escapeHtml(formatCSTFromChicagoLocal(entry.endISO))}
+        </div>
+        <div class="small subtle">Live · CST</div>
+      </div>
+
+      <div class="entry-grid">
+        ${renderDeptBlocks(
+          entry.departments,
+          roleAtLeast(APP_STATE.role, "editor"), // inline-edit allowed
+          entry.id,
+          false
+        )}
+      </div>
+    </div>
+  `;
+}
+
+
+/* =========================
  * Shared Dept Renderer
  * ========================= */
 
@@ -852,7 +978,9 @@ function renderScheduleAdmin(el) {
     const endInput = (e.endISO || "").slice(0, 16);
 
     el.innerHTML += `
-      <div class="schedule-card ${e._autoResolved ? "resolved" : ""}">
+      <div class="schedule-card
+     ${e._autoResolved ? "resolved" : ""}
+     ${isCurrentOnCall(e) ? "current-oncall" : ""}">
         <div class="card-head">
           <div>
             ${
@@ -867,7 +995,7 @@ function renderScheduleAdmin(el) {
                            step="60" />
                   </div>
                   <div class="inline-row">
-                    <label>End (Fri only)</label>
+                    <label>End (Auto-aligned to Fri 7:00 AM)</label>
                     <input type="datetime-local"
                            data-time="end"
                            data-id="${escapeHtml(String(e.id))}"
@@ -878,8 +1006,14 @@ function renderScheduleAdmin(el) {
                 `
                 : `
                   <div class="card-title">
-                    ${escapeHtml(startDisplay)} → ${escapeHtml(endDisplay)}
-                  </div>
+                  ${escapeHtml(startDisplay)} → ${escapeHtml(endDisplay)}
+                      ${
+                      (() => {
+                        const h = getHolidayName(isoToDateLocalAssumed(e.startISO));
+                        return h ? `<span class="holiday-badge">${escapeHtml(h)}</span>` : "";
+                          })()
+                            }
+                          </div>
                   <div class="small subtle">CST</div>
                 `
             }
@@ -1384,10 +1518,19 @@ function refreshTimeline() {
   const timeline = byId("timeline");
   if (!timeline) return;
 
-  const entries =
-    (APP_STATE.draftSchedule && APP_STATE.draftSchedule.entries) ||
-    (APP_STATE.schedulePublic && APP_STATE.schedulePublic.entries) ||
-    [];
+  let entries =
+  (APP_STATE.draftSchedule && APP_STATE.draftSchedule.entries) ||
+  (APP_STATE.schedulePublic && APP_STATE.schedulePublic.entries) ||
+  [];
+
+if (APP_STATE.dept !== "all") {
+  entries = entries.map(e => ({
+    ...e,
+    departments: e.departments?.[APP_STATE.dept]
+      ? { [APP_STATE.dept]: e.departments[APP_STATE.dept] }
+      : {}
+  }));
+}
 
   renderTimeline(timeline, entries);
 }
@@ -1408,8 +1551,8 @@ function renderTimeline(el, entries) {
     const endDisp = formatCSTFromChicagoLocal(e.endISO);
 
     const row = document.createElement("div");
-    row.className = "timeline-row-wrap";
-
+   const holiday = getHolidayName(isoToDateLocalAssumed(e.startISO));
+    row.className = "timeline-row-wrap" + (holiday ? " holiday-week" : "");
     row.innerHTML = `
       <div class="timeline-left">
         <div class="week-label">${escapeHtml(startLabel)}</div>
@@ -1422,6 +1565,20 @@ function renderTimeline(el, entries) {
 
     el.appendChild(row);
   });
+}
+/* =========================
+ * Auto-refresh (live updates)
+ * ========================= */
+let CURRENT_ONCALL_TIMER = null;
+
+function startCurrentOnCallAutoRefresh() {
+  if (CURRENT_ONCALL_TIMER) return;
+
+  renderCurrentOnCall();
+
+  CURRENT_ONCALL_TIMER = setInterval(() => {
+    renderCurrentOnCall();
+  }, 60_000); // every minute
 }
 
 function renderTimelineBlocks(entry) {
