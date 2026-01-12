@@ -1124,7 +1124,32 @@ function renderScheduleAdmin(el) {
       refreshTimeline();
     };
   });
+el.querySelectorAll("select[data-field='email']").forEach(sel => {
+  sel.onchange = () => {
+    HAS_UNSAVED_CHANGES = true;
 
+    const entryId = sel.getAttribute("data-entry");
+    const dep = sel.getAttribute("data-dept");
+    const email = sel.value;
+
+    const user = APP_STATE.roster?.[dep]?.find(u => u.email === email);
+    if (!user) return;
+
+    const entry = (APP_STATE.draftSchedule?.entries || [])
+      .find(e => String(e.id) === String(entryId));
+    if (!entry) return;
+
+    entry.departments[dep] = {
+      name: user.name,
+      email: user.email,
+      phone: user.phone || ""
+    };
+
+    refreshTimeline();
+    updateSaveState();
+  };
+});
+  
   el.querySelectorAll("input[data-entry]").forEach(inp => {
     inp.oninput = () => {
       HAS_UNSAVED_CHANGES = true;
@@ -1148,32 +1173,6 @@ function renderScheduleAdmin(el) {
 function deepClone(obj) {
   return JSON.parse(JSON.stringify(obj));
 }
-el.querySelectorAll("select[data-field='email']").forEach(sel => {
-  sel.onchange = () => {
-    HAS_UNSAVED_CHANGES = true;
-
-    const entryId = sel.getAttribute("data-entry");
-    const dep = sel.getAttribute("data-dept");
-    const email = sel.value;
-
-    const user = APP_STATE.roster?.[dep]?.find(u => u.email === email);
-    if (!user) return;
-
-    const entry = (APP_STATE.draftSchedule?.entries || [])
-      .find(e => String(e.id) === String(entryId));
-    if (!entry) return;
-
-    if (!entry.departments) entry.departments = {};
-    entry.departments[dep] = {
-      name: user.name,
-      email: user.email,
-      phone: user.phone || ""
-    };
-
-    refreshTimeline();
-    updateSaveState();
-  };
-});
 
 /* =========================
  * Save / Notify / Export / ICS
