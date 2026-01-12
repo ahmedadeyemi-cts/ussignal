@@ -493,7 +493,8 @@ function addScheduleEntryModal() {
       APP_STATE.draftSchedule.entries.push(newEntry);
       HAS_UNSAVED_CHANGES = true;
 
-      renderScheduleAdmin(byId("schedule"));
+      const scheduleEl = byId("schedule");
+        if (scheduleEl) renderScheduleAdmin(scheduleEl);
       refreshTimeline();
       updateSaveState();
 
@@ -1034,14 +1035,15 @@ function renderScheduleAdmin(el) {
   const isAdmin = roleAtLeast(APP_STATE.role, "admin");
 
   el.innerHTML = "";
-  if (!APP_STATE.draftSchedule?.entries?.length) {
+  if (!Array.isArray(APP_STATE.draftSchedule?.entries)) {
   el.innerHTML = `
     <div class="subtle" style="padding:12px">
-      No schedule entries returned from the server.
+      Schedule data is unavailable.
     </div>
   `;
   return;
 }
+
 
   const deptFilter = String(APP_STATE.dept || "all").toLowerCase();
   const restrictToAllowedDepts = roleAtLeast(APP_STATE.role, "admin") ? false : true;
