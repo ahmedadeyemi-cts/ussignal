@@ -258,7 +258,7 @@ if (!scheduleEl) {
 if (byId("roster")) {
   try {
     await loadRoster();
-    await loadScheduleAdmin(byId("schedule")); // 🔴 REQUIRED
+    
   } catch (e) {
     console.error("Roster load failed:", e);
     toast("Unable to load roster.", 5000);
@@ -268,18 +268,28 @@ if (byId("roster")) {
 } // ✅ THIS CLOSES initApp
 
 // ✅ Keep this at top-level (not nested)
-async function reloadSchedule() {
-  const scheduleDiv =
-    byId("schedulePanel") ||
-    byId("scheduleTab") ||
-    byId("schedule");
+//async function reloadSchedule() {
+//  const scheduleDiv =
+  //  byId("schedulePanel") ||
+  //  byId("scheduleTab") ||
+  //  byId("schedule");
 
-  if (!scheduleDiv) return;
+//  if (!scheduleDiv) return;
+
+ // if (APP_STATE.admin || roleAtLeast(APP_STATE.role, "editor")) {
+ //   await loadScheduleAdmin(scheduleDiv);
+//  } else {
+ //   await loadSchedulePublic(scheduleDiv);
+//  }
+//}
+async function reloadSchedule() {
+  const el = byId("schedule");
+  if (!el) return;
 
   if (APP_STATE.admin || roleAtLeast(APP_STATE.role, "editor")) {
-    await loadScheduleAdmin(scheduleDiv);
+    renderScheduleAdmin(el); // SAFE
   } else {
-    await loadSchedulePublic(scheduleDiv);
+    await loadSchedulePublic(el);
   }
 }
 
@@ -1045,9 +1055,12 @@ function renderScheduleAdmin(el) {
   const deptFilter = String(APP_STATE.dept || "all").toLowerCase();
   const restrictToAllowedDepts = roleAtLeast(APP_STATE.role, "admin") ? false : true;
 
- const entries = APP_STATE.draftSchedule?.entries || [];
-
-
+ const entries = (APP_STATE.draftSchedule?.entries || []).map(e => ({
+  ...e,
+  departments: e.departments || Object.fromEntries(
+    DEPT_KEYS.map(dep => [dep, { name: "", email: "", phone: "" }])
+  )
+}));
 
 
   entries.forEach(e => {
