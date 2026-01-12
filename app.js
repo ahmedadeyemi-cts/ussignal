@@ -962,6 +962,42 @@ function renderDeptBlocks(depts, editable, entryId, restrictToAllowedDepts) {
     })
     .join("");
 }
+/* =========================
+ * Normalized Schedule
+ * ========================= */
+function normalizeScheduleResponse(raw) {
+  // If Worker/KV returned a string
+  if (typeof raw === "string") {
+    try { raw = JSON.parse(raw); } catch { raw = {}; }
+  }
+
+  // Unwrap common containers
+  const container =
+    raw?.schedule ??
+    raw?.data ??
+    raw?.value ??
+    raw;
+
+  let entries =
+    container?.entries ??
+    container?.items ??
+    [];
+
+  // Entries sometimes stored as JSON string
+  if (typeof entries === "string") {
+    try { entries = JSON.parse(entries); } catch { entries = []; }
+  }
+
+  // Convert object map → array
+  if (entries && !Array.isArray(entries) && typeof entries === "object") {
+    entries = Object.values(entries);
+  }
+
+  if (!Array.isArray(entries)) entries = [];
+
+  return { entries };
+}
+
 
 /* =========================
  * Admin Schedule (Editor/Admin)
@@ -974,11 +1010,15 @@ async function loadScheduleAdmin(el) {
   const raw = await res.json();
 
 // 🔐 Normalize backend response (supports old + new formats)
-const data =
-  raw?.entries ? raw :
-  raw?.schedule?.entries ? raw.schedule :
-  raw?.data?.entries ? raw.data :
-  { entries: [] };
+let raw;
+try {
+  raw = await res.json();
+} catch {
+  raw = await res.text();
+}
+
+const data = normalizeScheduleResponse(raw);
+
 
   APP_STATE.scheduleFull = data;
   APP_STATE.draftSchedule = deepClone(data);
@@ -997,6 +1037,14 @@ function renderScheduleAdmin(el) {
   const isAdmin = roleAtLeast(APP_STATE.role, "admin");
 
   el.innerHTML = "";
+  if (!APP_STATE.draftSchedule?.entries?.length) {
+  el.innerHTML = `
+    <div class="subtle" style="padding:12px">
+      No schedule entries returned from the server.
+    </div>
+  `;
+  return;
+}
 
   const deptFilter = String(APP_STATE.dept || "all").toLowerCase();
   const restrictToAllowedDepts = roleAtLeast(APP_STATE.role, "admin") ? false : true;
