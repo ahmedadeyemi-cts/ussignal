@@ -222,7 +222,7 @@ APP_STATE.allowedDepartments = Array.isArray(ctx?.departments)
   ));
 
   onClick("saveAllBtn", saveAllChanges);
-  onClick("addScheduleBtn", addScheduleEntryModal);
+  // onClick("addScheduleBtn", addScheduleEntryModal);
 
 
   onClick("rosterReloadBtn", loadRoster);
@@ -436,12 +436,6 @@ function addScheduleEntryModal() {
           Duration is fixed at exactly 7 days.
         </div>
       </div>
-
-      <div class="small subtle" style="margin-top:10px">
-        Start will be set to <b>4:00 PM CST</b><br/>
-        End will be set to <b>7:00 AM CST</b><br/>
-        Duration must be exactly 7 days.
-      </div>
     `,
     "Add",
     async () => {
@@ -509,8 +503,14 @@ function wireTabs() {
         byId("accessDeniedTab")?.classList.add("active");
         return;
       }
-      if (target === "currentTab") startCurrentOnCallAutoRefresh();
-      const target = tab.dataset.tab;
+     const target = tab.dataset.tab;
+
+     if (target === "currentTab") {
+  startCurrentOnCallAutoRefresh();
+} else {
+  stopCurrentOnCallAutoRefresh();
+}
+
       byId(target)?.classList.add("active");
 
       if (target === "auditTab") loadAudit().catch(() => {});
@@ -1580,6 +1580,14 @@ function startCurrentOnCallAutoRefresh() {
     renderCurrentOnCall();
   }, 60_000); // every minute
 }
+
+function stopCurrentOnCallAutoRefresh() {
+  if (CURRENT_ONCALL_TIMER) {
+    clearInterval(CURRENT_ONCALL_TIMER);
+    CURRENT_ONCALL_TIMER = null;
+  }
+}
+
 
 function renderTimelineBlocks(entry) {
   const depts = entry.departments || {};
