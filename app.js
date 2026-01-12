@@ -248,16 +248,17 @@ APP_STATE.allowedDepartments = Array.isArray(ctx?.departments)
   // =========================
   // LOAD DATA (NON-BLOCKING)
   // =========================
-  const scheduleEl = byId("schedule");
+const scheduleEl =
+  byId("schedulePanel") ||
+  byId("scheduleTab") ||
+  byId("schedule");
 
-if (scheduleEl) {
-  try {
-    await loadScheduleAdmin(scheduleEl);
-  } catch (e) {
-    console.error("Schedule admin load failed:", e);
-    toast("Admin access denied by Cloudflare.", 5000);
-  }
+if (!scheduleEl) {
+  console.error("Schedule container not found in DOM");
+} else {
+  await loadScheduleAdmin(scheduleEl);
 }
+
 if (byId("roster")) {
   try {
     await loadRoster();
@@ -271,7 +272,11 @@ if (byId("roster")) {
 
 // ✅ Keep this at top-level (not nested)
 async function reloadSchedule() {
-  const scheduleDiv = byId("schedule");
+  const scheduleDiv =
+    byId("schedulePanel") ||
+    byId("scheduleTab") ||
+    byId("schedule");
+
   if (!scheduleDiv) return;
 
   if (APP_STATE.admin || roleAtLeast(APP_STATE.role, "editor")) {
@@ -280,6 +285,7 @@ async function reloadSchedule() {
     await loadSchedulePublic(scheduleDiv);
   }
 }
+
 /* =========================
  * Disable Save button until dirty
  * ========================= */
