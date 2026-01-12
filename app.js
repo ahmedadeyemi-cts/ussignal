@@ -1597,7 +1597,7 @@ function refreshTimeline() {
   (APP_STATE.schedulePublic && APP_STATE.schedulePublic.entries) ||
   [];
 
-if (APP_STATE.dept !== "all") {
+if (APP_STATE.dept !== "all" && DEPT_KEYS.includes(APP_STATE.dept)) {
   entries = entries.map(e => ({
     ...e,
     departments: e.departments?.[APP_STATE.dept]
