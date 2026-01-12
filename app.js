@@ -484,6 +484,7 @@ function applyRBACToUI() {
   const isAdmin = roleAtLeast(APP_STATE.role, "admin");
 
   setHidden("saveAllBtn", !canEdit);
+  setHidden("addScheduleBtn", !canEdit);
   setHidden("revertBtn", !isAdmin);
   setHidden("notifyBtn", !isAdmin);
   setHidden("exportBtn", !isAdmin);
