@@ -670,8 +670,15 @@ function validateOnCallWindow(startISO, endISO) {
   if (s.getHours() !== 16 || s.getMinutes() !== 0) return "Start time must be 4:00 PM CST.";
   if (e.getHours() !== 7 || e.getMinutes() !== 0) return "End time must be 7:00 AM CST.";
 
-  const diffDays = (e - s) / 86400000;
-  if (diffDays < 6.99 || diffDays > 7.01) return "On-call window must be exactly 7 days.";
+  const diffMs = e - s;
+const expectedMs =
+  (6 * 24 * 60 * 60 * 1000) +  // 6 days
+  (15 * 60 * 60 * 1000);     // + 15 hours
+
+if (Math.abs(diffMs - expectedMs) > 60_000) {
+  return "On-call window must be Friday 4:00 PM → Friday 7:00 AM CST.";
+}
+
 
   return null;
 }
