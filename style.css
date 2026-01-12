@@ -410,3 +410,10 @@ body {
   opacity: 1;
   pointer-events: auto;
 }
+.current-oncall .card-title::after {
+  content: " ● LIVE";
+  color: #16a34a;
+  font-weight: 600;
+  margin-left: 8px;
+}
+
