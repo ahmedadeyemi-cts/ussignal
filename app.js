@@ -287,12 +287,11 @@ async function reloadSchedule() {
   if (!el) return;
 
   if (APP_STATE.admin || roleAtLeast(APP_STATE.role, "editor")) {
-    renderScheduleAdmin(el); // SAFE
+    await loadScheduleAdmin(el);   // ✅ ALWAYS reload from KV
   } else {
     await loadSchedulePublic(el);
   }
 }
-
 /* =========================
  * Disable Save button until dirty
  * ========================= */
