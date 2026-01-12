@@ -567,13 +567,22 @@ function setHidden(id, hidden) {
 /* =========================
  * Time Utilities
  * ========================= */
-
 function parseLocalIsoParts(localISO) {
-  const m = String(localISO || "").match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/);
+  // Accept:
+  //  - YYYY-MM-DDTHH:mm
+  //  - YYYY-MM-DDTHH:mm:ss
+  //  - optionally with .sss (ignored)
+  const m = String(localISO || "").match(
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?/
+  );
   if (!m) return null;
   return {
-    y: Number(m[1]), mo: Number(m[2]), d: Number(m[3]),
-    h: Number(m[4]), mi: Number(m[5]), s: Number(m[6])
+    y: Number(m[1]),
+    mo: Number(m[2]),
+    d: Number(m[3]),
+    h: Number(m[4]),
+    mi: Number(m[5]),
+    s: Number(m[6] || "0")
   };
 }
 
