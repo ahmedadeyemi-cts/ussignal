@@ -120,6 +120,7 @@
   <button class="tab" data-tab="rosterTab" data-requires="admin">Roster</button>
   <button class="tab" data-tab="autogenTab" data-requires="admin">Auto-Generate</button>
   <button class="tab" data-tab="auditTab" data-requires="admin">Audit</button>
+  <button class="tab" data-tab="historyTab" data-requires="admin">History</button>
 </nav>
 
 <main class="container">
@@ -230,6 +231,17 @@
       <p>Contact an administrator if you believe this is an error.</p>
     </div>
   </section>
+<!-- HISTORY -->
+<section id="historyTab" class="panel">
+  <div class="panel-head">
+    <h2>Archived On-Call History</h2>
+    <div class="small subtle">
+      Past schedules are read-only and cannot be modified.
+    </div>
+  </div>
+
+  <div id="history"></div>
+</section>
 
 </main>
 
