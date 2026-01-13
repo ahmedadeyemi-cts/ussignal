@@ -1218,15 +1218,18 @@ function renderScheduleAdmin(el) {
                   <div class="small subtle">CST · Fri 4:00 PM → Fri 7:00 AM</div>
                 `
                 : `
-                  <div class="card-title">
-                  ${escapeHtml(startDisplay)} → ${escapeHtml(endDisplay)}
-                      ${
-                      (() => {
-                        const h = getHolidayName(isoToDateLocalAssumed(e.startISO));
-                        return h ? `<span class="holiday-badge">${escapeHtml(h)}</span>` : "";
-                          })()
-                            }
-                          </div>
+                 <div class="card-title">
+  ${escapeHtml(startDisplay)} → ${escapeHtml(endDisplay)}
+  ${
+    (() => {
+      const h = getHolidayName(isoToDateLocalAssumed(e.startISO));
+      return h
+        ? `<span class="holiday-badge">${escapeHtml(h)}</span>`
+        : "";
+    })()
+  }
+</div>
+
                   <div class="small subtle">CST</div>
                 `
             }
