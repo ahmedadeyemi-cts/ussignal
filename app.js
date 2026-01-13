@@ -1237,21 +1237,19 @@ function renderScheduleAdmin(el) {
           </div>
 
           <div class="card-actions">
-            ${isAdmin && !isPastOnCall(e)
+           ${isAdmin && !isPastOnCall(e)
   ? `<button class="ghost" data-action="notifyEntry" data-id="${escapeHtml(String(e.id))}">
        Notify
      </button>`
-  : ``}
+  : ""}
 
-           ${
-  canEdit && !isPast
-    ? `<button class="primary" data-action="${editing ? "done" : "edit"}" data-id="${escapeHtml(String(e.id))}">
-         ${editing ? "Done" : "Edit"}
-       </button>`
-    : isPast
-      ? `<span class="small subtle">Locked</span>`
-      : ``
-}
+          ${canEdit && !isPast
+  ? `<button class="primary" data-action="${editing ? "done" : "edit"}" data-id="${escapeHtml(String(e.id))}">
+       ${editing ? "Done" : "Edit"}
+     </button>`
+  : isPast
+    ? `<span class="small subtle">Locked</span>`
+    : ""}
           </div>
         </div>
 
