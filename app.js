@@ -171,9 +171,6 @@ APP_STATE.isAuthenticated = !!ctx?.email;
 APP_STATE.admin = ctx?.role === "admin";
 APP_STATE.role = ctx?.role || "viewer";
 APP_STATE.email = ctx?.email || "";
-APP_STATE.allowedDepartments = Array.isArray(ctx?.departments)
-  ? ctx.departments
-  : [];
 
 
 // Optional: email if Access injected it
@@ -1310,23 +1307,7 @@ function renderScheduleAdmin(el) {
     }
   );
   return;
-}
-
-        confirmModal(
-          "Notify This Week",
-          "Send start and end notifications for this entry?",
-          async () => {
-            const res = await fetchAuth(`/api/admin/oncall/notify`, {
-              method: "POST",
-              headers: { "content-type": "application/json" },
-              body: JSON.stringify({ mode: "both", entryId: id })
-            });
-            if (!res.ok) throw new Error(await res.text());
-            toast("Notifications sent.");
-          }
-        );
-        return;
-      }
+   }
     };
   });
   el.querySelectorAll("input[data-time]").forEach(inp => {
