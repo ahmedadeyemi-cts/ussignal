@@ -5,10 +5,59 @@
   <title>US Signal | On-Call Schedule</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <!-- Favicon -->
   <link rel="icon" href="./ussignal.jpg" type="image/jpeg" />
-
   <link rel="stylesheet" href="style.css" />
+
+  <!-- =========================
+       PUBLIC UX ENHANCEMENTS
+  ========================= -->
+  <style>
+    /* ---------- Mobile Optimizations ---------- */
+    @media (max-width: 768px) {
+      .topbar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+      }
+
+      .controls {
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .tabs {
+        overflow-x: auto;
+        white-space: nowrap;
+      }
+
+      .schedule-card {
+        padding: 12px;
+      }
+
+      .timeline-row-wrap {
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .timeline-left {
+        width: 100%;
+      }
+    }
+
+    /* ---------- Public Current On-Call ---------- */
+    .public-current {
+      border-left: 6px solid #0ea5e9;
+      background: linear-gradient(90deg, rgba(14,165,233,.12), transparent);
+      margin-bottom: 16px;
+    }
+
+    /* ---------- Header CTA ---------- */
+    .pay-btn {
+      text-decoration: none;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+  </style>
 </head>
 
 <body class="light">
@@ -18,11 +67,14 @@
     <img src="ussignal.jpg" alt="US Signal" class="logo" />
     <div>
       <div class="brand-title">US Signal</div>
-      <div class="brand-sub">On-Call Schedule (Read-Only)</div>
+      <div class="brand-sub">On-Call Schedule (Public)</div>
     </div>
   </div>
 
   <div class="controls">
+    <!-- Theme Toggle -->
+    <button id="themeToggle" class="ghost" title="Toggle light/dark mode">🌙</button>
+
     <!-- Department Filter -->
     <select id="deptFilter">
       <option value="all">All Departments</option>
@@ -31,33 +83,48 @@
       <option value="system_storage">System & Storage</option>
     </select>
 
-    <!-- Pay Request Button -->
+    <!-- Pay Request -->
     <a
-      href="https://forms.microsoft.com/Pages/ResponsePage.aspx?id=2kFZU3Lai0qDeJg6VL7DQmcodVUCw2tHgn0S1PzMbxpUQ0NXTlQ5TEtERzE0RzNHN0tNMjJNWThWRS4u"
+      class="primary pay-btn"
       target="_blank"
       rel="noopener noreferrer"
-      class="primary"
-      style="text-decoration:none"
+      href="https://forms.microsoft.com/Pages/ResponsePage.aspx?id=2kFZU3Lai0qDeJg6VL7DQmcodVUCw2tHgn0S1PzMbxpUQ0NXTlQ5TEtERzE0RzNHN0tNMjJNWThWRS4u"
     >
       US Signal Oncall Pay Request
     </a>
   </div>
 </header>
 
-<!-- Tabs (Public) -->
+<!-- =========================
+     PUBLIC TABS
+========================= -->
 <nav class="tabs">
-  <button class="tab active" data-tab="scheduleTab">Schedule</button>
+  <button class="tab active" data-tab="currentTab">Who’s On Call Now</button>
+  <button class="tab" data-tab="scheduleTab">Schedule</button>
   <button class="tab" data-tab="timelineTab">Timeline</button>
 </nav>
 
 <main class="container">
 
-  <!-- Schedule -->
-  <section id="scheduleTab" class="panel active">
+  <!-- CURRENT ON-CALL -->
+  <section id="currentTab" class="panel active">
+    <div class="panel-head">
+      <h2>Who’s On Call Now</h2>
+      <div class="small subtle">Live · Read-only · Auto-updated</div>
+    </div>
+    <div id="currentOnCall" class="public-current"></div>
+  </section>
+
+  <!-- SCHEDULE -->
+  <section id="scheduleTab" class="panel">
+    <div class="panel-head">
+      <h2>On-Call Schedule</h2>
+      <div class="small subtle">Read-only · CST</div>
+    </div>
     <div id="schedule"></div>
   </section>
 
-  <!-- Timeline -->
+  <!-- TIMELINE -->
   <section id="timelineTab" class="panel">
     <h2>Weekly Timeline</h2>
     <div id="timeline"></div>
@@ -67,14 +134,16 @@
 
 <div id="toast" class="toast hidden"></div>
 
-<!-- App Logic -->
+<!-- =========================
+     APP LOGIC
+========================= -->
 <script src="app.js"></script>
 <script>
   /**
-   * PUBLIC MODE
+   * PUBLIC INITIALIZATION
    * - No authentication
-   * - No admin privileges
-   * - Read-only rendering
+   * - Viewer role only
+   * - Uses /api/oncall (public)
    */
   initApp({
     admin: false,
