@@ -9,7 +9,22 @@ export async function onRequest({ request, env }) {
     }
 
     // -------------------------------
-    // Load schedule
+    // Parse request body
+    // -------------------------------
+    let payload = {};
+    if (request.method === "POST") {
+      try {
+        payload = await request.json();
+      } catch {
+        payload = {};
+      }
+    }
+
+    const mode = payload.mode || "both"; // both | start | end
+    const entryId = payload.entryId || null;
+
+    // -------------------------------
+    // Load current schedule
     // -------------------------------
     const raw = await env.ONCALL_KV.get("ONCALL:CURRENT");
     if (!raw) {
@@ -20,37 +35,59 @@ export async function onRequest({ request, env }) {
     const entries = schedule.entries || [];
 
     if (!entries.length) {
-      return json({ error: "No entries to notify" }, 400);
+      return json({ error: "No entries available" }, 400);
     }
 
     // -------------------------------
-    // Determine CURRENT on-call
+    // Determine target entries
     // -------------------------------
     const now = new Date();
 
-    const active = entries.filter(e => {
-      const start = new Date(e.startISO);
-      const end = new Date(e.endISO);
-      return now >= start && now <= end;
-    });
+    let targets = [];
 
-    if (!active.length) {
-      return json({ error: "No active on-call entry" }, 400);
+    if (entryId) {
+      const found = entries.find(e => String(e.id) === String(entryId));
+      if (!found) {
+        return json({ error: "Entry not found" }, 404);
+      }
+      targets = [found];
+    } else {
+      targets = entries.filter(e => {
+        const start = new Date(e.startISO);
+        const end = new Date(e.endISO);
+        return now >= start && now <= end;
+      });
+    }
+
+    if (!targets.length) {
+      return json({ error: "No active on-call entries" }, 400);
+    }
+
+    // -------------------------------
+    // Prevent notify on past entries
+    // -------------------------------
+    for (const e of targets) {
+      const end = new Date(e.endISO);
+      if (end <= now) {
+        return json(
+          { error: "Cannot notify for past on-call entries" },
+          400
+        );
+      }
     }
 
     // -------------------------------
     // Build recipients + content
     // -------------------------------
-    const admins = env.ADMIN_NOTIFICATION
+    const admins = (env.ADMIN_NOTIFICATION || "")
       .split(",")
       .map(e => e.trim())
       .filter(Boolean);
 
     const portal = env.PUBLIC_PORTAL_URL;
-
     let emailsSent = 0;
 
-    for (const entry of active) {
+    for (const entry of targets) {
       const to = [];
       const teamLines = [];
 
@@ -63,20 +100,35 @@ export async function onRequest({ request, env }) {
         });
 
         teamLines.push(
-          `<li><strong>${team}</strong>: ${person.name} (${person.email})</li>`
+          `<li><strong>${team}</strong>: ${person.name || ""} (${person.email})</li>`
         );
       }
 
       if (!to.length) continue;
 
+      const subject =
+        mode === "start"
+          ? "On-Call Duty Started"
+          : mode === "end"
+          ? "On-Call Duty Ending"
+          : "You Are Currently On Call";
+
       const html = `
         <p>Hello,</p>
-        <p>You are currently on call.</p>
+        <p>
+          ${
+            mode === "start"
+              ? "Your on-call duty has started."
+              : mode === "end"
+              ? "Your on-call duty is ending."
+              : "You are currently on call."
+          }
+        </p>
 
         <ul>${teamLines.join("")}</ul>
 
         <p>
-          View the full on-call schedule:
+          View the full on-call schedule:<br/>
           <a href="${portal}">${portal}</a>
         </p>
       `;
@@ -84,7 +136,7 @@ export async function onRequest({ request, env }) {
       await sendBrevo(env, {
         to,
         cc: admins,
-        subject: "You Are Currently On Call",
+        subject,
         html
       });
 
@@ -95,15 +147,15 @@ export async function onRequest({ request, env }) {
     // Audit
     // -------------------------------
     await audit(env, {
-      action: "MANUAL_NOTIFY",
-      entries: active.length,
+      action: entryId ? "MANUAL_NOTIFY_ENTRY" : "MANUAL_NOTIFY_ACTIVE",
+      mode,
+      entryId,
       emailsSent
     });
 
     return json({ ok: true, emailsSent });
 
   } catch (err) {
-    // THIS is what was missing before
     console.error("NOTIFY ERROR:", err);
     return json(
       { error: "Notify failed", detail: err.message },
