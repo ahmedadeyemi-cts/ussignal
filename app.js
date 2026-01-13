@@ -1018,7 +1018,38 @@ function normalizeScheduleResponse(raw) {
 
   return { entries };
 }
+/* =========================
+ * Client-Side Normalization (Bulk Upload Input)
+ * ========================= */
 
+function normalizeScheduleEntriesFromBulk(rows) {
+  const map = new Map();
+
+  for (const r of rows || []) {
+    if (!r.startISO || !r.endISO || !r.team) continue;
+
+    const key = `${r.startISO}::${r.endISO}`;
+
+    if (!map.has(key)) {
+      map.set(key, {
+        id: crypto.randomUUID(),
+        startISO: r.startISO,
+        endISO: r.endISO,
+        departments: {}
+      });
+    }
+
+    const entry = map.get(key);
+
+    entry.departments[r.team] = {
+      name: (r.name || "").trim(),
+      email: (r.email || "").trim(),
+      phone: (r.phone || "").trim()
+    };
+  }
+
+  return Array.from(map.values());
+}
 /* =========================
  * Admin Schedule (Editor/Admin)
  * ========================= */
