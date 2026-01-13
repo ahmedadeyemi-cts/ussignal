@@ -1240,14 +1240,14 @@ function renderScheduleAdmin(el) {
      </button>`
   : ``}
 
-            ${
-              ${canEdit && !isPast
-  ? `<button class="primary" data-action="${editing ? "done" : "edit"}" data-id="${escapeHtml(String(e.id))}">
-      ${editing ? "Done" : "Edit"}
-    </button>`
-  : isPast
-    ? `<span class="small subtle">Locked</span>`
-    : ``
+           ${
+  canEdit && !isPast
+    ? `<button class="primary" data-action="${editing ? "done" : "edit"}" data-id="${escapeHtml(String(e.id))}">
+         ${editing ? "Done" : "Edit"}
+       </button>`
+    : isPast
+      ? `<span class="small subtle">Locked</span>`
+      : ``
 }
           </div>
         </div>
@@ -2057,10 +2057,13 @@ function renderTimeline(el, entries) {
 
     const row = document.createElement("div");
   const past = isPastOnCall(e);
+const holidayName = getHolidayName(isoToDateLocalAssumed(e.startISO));
+
 row.className =
   "timeline-row-wrap" +
-  (holiday ? " holiday-week" : "") +
+  (holidayName ? " holiday-week" : "") +
   (past ? " timeline-past" : "");
+
 
     row.innerHTML = `
       <div class="timeline-left">
