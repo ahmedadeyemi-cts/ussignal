@@ -556,6 +556,8 @@ function wireTabs() {
 
       if (target === "auditTab") loadAudit().catch(() => {});
       if (target === "timelineTab") refreshTimeline();
+      if (target === "historyTab") loadHistory().catch(() => {});
+
     };
   });
 }
@@ -1938,6 +1940,62 @@ async function loadAudit() {
       </div>
     `;
   }).join("");
+}
+/* =========================
+ * History (Archived Schedules)
+ * ========================= */
+
+async function loadHistory() {
+  const el = byId("history");
+  if (!el) return;
+
+  el.innerHTML = `<div class="subtle">Loading history…</div>`;
+
+  const res = await fetchAuth(`/api/admin/oncall/history`, { method: "GET" });
+  if (!res.ok) {
+    el.innerHTML = `<div class="subtle">Unable to load history.</div>`;
+    return;
+  }
+
+  const raw = await res.json();
+  const data = normalizeScheduleResponse(raw);
+  const entries = data.entries || [];
+
+  if (!entries.length) {
+    el.innerHTML = `<div class="subtle">No archived schedules.</div>`;
+    return;
+  }
+
+  renderHistory(el, entries);
+}
+function renderHistory(el, entries) {
+  el.innerHTML = "";
+
+  const sorted = [...entries].sort(
+    (a, b) =>
+      isoToDateLocalAssumed(b.startISO) -
+      isoToDateLocalAssumed(a.startISO)
+  );
+
+  sorted.forEach(e => {
+    el.innerHTML += `
+      <div class="schedule-card past-week">
+        <div class="card-head">
+          <div class="card-title">
+            ${escapeHtml(formatCSTFromChicagoLocal(e.startISO))}
+            →
+            ${escapeHtml(formatCSTFromChicagoLocal(e.endISO))}
+          </div>
+          <div class="small subtle">Archived · Read-only</div>
+          <div class="small">Entry ID: ${escapeHtml(String(e.id))}</div>
+        </div>
+
+        <div class="entry-grid">
+          ${renderDeptBlocks(e.departments, false, e.id, false)}
+        </div>
+      </div>
+    `;
+  });
 }
 
 /* =========================
