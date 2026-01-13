@@ -527,3 +527,7 @@ body {
   color: #9ca3af;
   margin-top: 4px;
 }
+.timeline-past {
+  opacity: 0.55;
+  filter: grayscale(0.25);
+}
