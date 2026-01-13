@@ -616,3 +616,25 @@ body {
   color: #6b7280;
   letter-spacing: 0.08em;
 }
+.pay-request-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #1e40af, #2563eb);
+  color: #fff;
+  font-weight: 600;
+  font-size: 13px;
+  text-decoration: none;
+  box-shadow: 0 1px 2px rgba(0,0,0,.15);
+}
+
+.pay-request-btn:hover {
+  background: linear-gradient(135deg, #1e3a8a, #1d4ed8);
+}
+
+.pay-request-btn:focus-visible {
+  outline: 3px solid #93c5fd;
+  outline-offset: 2px;
+}
