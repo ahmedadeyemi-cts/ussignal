@@ -167,9 +167,14 @@ async function initApp(ctx = {}) {
 // AUTH FROM CLOUDFLARE ACCESS
 // =========================
 // Cloudflare Access already authenticated the user if admin.html loaded
-APP_STATE.isAuthenticated = true;
-APP_STATE.admin = true;
-APP_STATE.role = "admin";
+APP_STATE.isAuthenticated = !!ctx?.email;
+APP_STATE.admin = ctx?.role === "admin";
+APP_STATE.role = ctx?.role || "viewer";
+APP_STATE.email = ctx?.email || "";
+APP_STATE.allowedDepartments = Array.isArray(ctx?.departments)
+  ? ctx.departments
+  : [];
+
 
 // Optional: email if Access injected it
 APP_STATE.email = ctx?.email || "";
@@ -1078,7 +1083,10 @@ function wireScheduleBulkUpload() {
 
     const preview = [];
     const warnings = [];
-    const draft = deepClone(APP_STATE.draftSchedule);
+   const draft = deepClone(
+  APP_STATE.draftSchedule || { entries: [] }
+);
+
 
     incoming.forEach(ne => {
       const conflict = detectOverlaps([...draft.entries, ne]);
