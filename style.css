@@ -510,3 +510,20 @@ body {
   pointer-events: none;
   filter: grayscale(0.3);
 }
+.schedule-card.past-week {
+  opacity: .55;
+  filter: grayscale(.15);
+}
+.schedule-card.past-week input,
+.schedule-card.past-week button.primary {
+  pointer-events: none;
+  opacity: .6;
+  cursor: not-allowed;
+}
+.schedule-card.past-week .card-head::after {
+  content: "PAST WEEK (LOCKED)";
+  display: block;
+  font-size: 11px;
+  color: #9ca3af;
+  margin-top: 4px;
+}
