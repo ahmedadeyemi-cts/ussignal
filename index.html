@@ -9,53 +9,80 @@
   <link rel="stylesheet" href="style.css" />
 
   <!-- =========================
-       PUBLIC UX ENHANCEMENTS
+       PUBLIC UI ENHANCEMENTS
   ========================= -->
   <style>
-    /* ---------- Mobile Optimizations ---------- */
-    @media (max-width: 768px) {
-      .topbar {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 12px;
-      }
+    /* ===== PAY REQUEST BUTTON ===== */
+    .pay-request-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #1e40af, #2563eb);
+      color: #ffffff;
+      font-weight: 600;
+      font-size: 13px;
+      text-decoration: none;
+      box-shadow: 0 1px 2px rgba(0,0,0,.15);
+      white-space: nowrap;
+    }
+    .pay-request-btn:hover {
+      background: linear-gradient(135deg, #1e3a8a, #1d4ed8);
+    }
+    .pay-request-btn:focus-visible {
+      outline: 3px solid #93c5fd;
+      outline-offset: 2px;
+    }
 
+    /* ===== PUBLIC TABS ===== */
+    .tabs {
+      display: flex;
+      gap: 6px;
+      padding: 10px;
+      background: var(--card);
+      border-radius: 12px;
+      margin-bottom: 16px;
+      overflow-x: auto;
+    }
+    .tabs button {
+      flex: 1;
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-weight: 600;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+    }
+    .tabs button.active {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    /* ===== MOBILE OPTIMIZATION ===== */
+    @media (max-width: 768px) {
       .controls {
         flex-wrap: wrap;
         gap: 8px;
       }
-
-      .tabs {
-        overflow-x: auto;
-        white-space: nowrap;
-      }
-
-      .schedule-card {
-        padding: 12px;
-      }
-
-      .timeline-row-wrap {
-        flex-direction: column;
-        gap: 8px;
-      }
-
-      .timeline-left {
+      .pay-request-btn {
         width: 100%;
+        justify-content: center;
       }
     }
 
-    /* ---------- Public Current On-Call ---------- */
-    .public-current {
+    /* ===== LIVE CARD ===== */
+    .live-card {
       border-left: 6px solid #0ea5e9;
-      background: linear-gradient(90deg, rgba(14,165,233,.12), transparent);
+      background: linear-gradient(90deg, rgba(14,165,233,.08), transparent);
+      padding: 14px;
+      border-radius: 12px;
       margin-bottom: 16px;
     }
 
-    /* ---------- Header CTA ---------- */
-    .pay-btn {
-      text-decoration: none;
-      font-weight: 600;
-      white-space: nowrap;
+    .subtle {
+      color: var(--muted);
+      font-size: 13px;
     }
   </style>
 </head>
@@ -72,84 +99,122 @@
   </div>
 
   <div class="controls">
-    <!-- Theme Toggle -->
-    <button id="themeToggle" class="ghost" title="Toggle light/dark mode">🌙</button>
+    <button
+      id="themeToggle"
+      class="ghost"
+      aria-label="Toggle light or dark mode"
+    >
+      🌙
+    </button>
 
-    <!-- Department Filter -->
-    <select id="deptFilter">
+    <select
+      id="deptFilter"
+      aria-label="Filter by department"
+    >
       <option value="all">All Departments</option>
       <option value="enterprise_network">Enterprise Network</option>
       <option value="collaboration">Collaboration</option>
       <option value="system_storage">System & Storage</option>
     </select>
 
-    <!-- Pay Request -->
     <a
-  href="https://forms.microsoft.com/Pages/ResponsePage.aspx?id=2kFZU3Lai0qDeJg6VL7DQmcodVUCw2tHgn0S1PzMbxpUQ0NXTlQ5TEtERzE0RzNHN0tNMjJNWThWRS4u"
-  target="_blank"
-  rel="noopener"
-  class="pay-request-btn"
-  aria-label="Submit On-Call Pay Request"
->
-  💼 On-Call Pay Request
-</a>
-
+      href="https://forms.microsoft.com/Pages/ResponsePage.aspx?id=2kFZU3Lai0qDeJg6VL7DQmcodVUCw2tHgn0S1PzMbxpUQ0NXTlQ5TEtERzE0RzNHN0tNMjJNWThWRS4u"
+      target="_blank"
+      rel="noopener"
+      class="pay-request-btn"
+      aria-label="Submit US Signal On-Call Pay Request"
+    >
+      💼 On-Call Pay Request
+    </a>
   </div>
 </header>
 
 <!-- =========================
      PUBLIC TABS
 ========================= -->
-<nav class="tabs">
-  <button class="tab active" data-tab="currentTab">Who’s On Call Now</button>
-  <button class="tab" data-tab="scheduleTab">Schedule</button>
-  <button class="tab" data-tab="timelineTab">Timeline</button>
+<nav class="tabs" role="tablist">
+  <button
+    class="active"
+    data-tab="currentTab"
+    role="tab"
+    aria-selected="true"
+  >
+    Who’s On Call Now
+  </button>
+  <button
+    data-tab="scheduleTab"
+    role="tab"
+    aria-selected="false"
+  >
+    Schedule
+  </button>
+  <button
+    data-tab="timelineTab"
+    role="tab"
+    aria-selected="false"
+  >
+    Timeline
+  </button>
 </nav>
 
 <main class="container">
 
-  <!-- CURRENT ON-CALL -->
-  <section id="currentTab" class="panel active">
+  <!-- WHO'S ON CALL NOW -->
+  <section
+    id="currentTab"
+    class="panel active"
+    role="tabpanel"
+  >
     <div class="panel-head">
       <h2>Who’s On Call Now</h2>
-      <div class="small subtle">Live · Read-only · Auto-updated</div>
+      <div class="subtle">Live · Read-only · Auto-updated</div>
     </div>
-    <div id="currentOnCall" class="public-current"></div>
+
+    <div
+      id="currentOnCall"
+      class="live-card"
+      aria-live="polite"
+      aria-atomic="true"
+    ></div>
   </section>
 
   <!-- SCHEDULE -->
-  <section id="scheduleTab" class="panel">
-    <div class="panel-head">
-      <h2>On-Call Schedule</h2>
-      <div class="small subtle">Read-only · CST</div>
-    </div>
+  <section
+    id="scheduleTab"
+    class="panel"
+    role="tabpanel"
+  >
+    <h2>On-Call Schedule</h2>
     <div id="schedule"></div>
   </section>
 
   <!-- TIMELINE -->
-  <section id="timelineTab" class="panel">
+  <section
+    id="timelineTab"
+    class="panel"
+    role="tabpanel"
+  >
     <h2>Weekly Timeline</h2>
     <div id="timeline"></div>
   </section>
 
 </main>
 
-<div id="toast" class="toast hidden"></div>
+<div
+  id="toast"
+  class="toast hidden"
+  role="status"
+  aria-live="polite"
+></div>
 
-<!-- =========================
-     APP LOGIC
-========================= -->
-<script src="app.js"></script>
+<script src="app.js" defer></script>
 <script>
-  /**
-   * PUBLIC INITIALIZATION
-   * - No authentication
-   * - Viewer role only
-   * - Uses /api/oncall (public)
-   */
-  initApp({
-    admin: false,
-    role: "viewer"
+  // PUBLIC MODE — no admin, no auth, no notify, no edits
+  window.addEventListener("DOMContentLoaded", () => {
+    initApp({
+      admin: false,
+      public: true
+    });
   });
 </script>
 
