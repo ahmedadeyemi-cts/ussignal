@@ -126,12 +126,31 @@
 
   <!-- SCHEDULE -->
   <section id="scheduleTab" class="panel active">
-    <div class="panel-head">
-      <h2>On-Call Schedule</h2>
+  <div class="panel-head">
+    <h2>On-Call Schedule</h2>
+    <div class="panel-actions">
       <button id="addScheduleBtn" class="primary">Add Schedule</button>
+
+      <!-- BULK UPLOAD -->
+      <label class="ghost file-btn">
+        Bulk Upload (CSV / Excel)
+        <input
+          id="scheduleUploadInput"
+          type="file"
+          accept=".csv,.xlsx"
+          hidden
+        />
+      </label>
     </div>
-    <div id="schedule"></div>
-  </section>
+  </div>
+
+  <div class="small subtle" style="margin-bottom:10px">
+    CSV/Excel columns required:
+    <b>startISO, endISO, department, name, email, phone</b>
+  </div>
+
+  <div id="schedule"></div>
+</section>
 
   <!-- WHO'S ON CALL NOW -->
   <section id="currentTab" class="panel">
@@ -149,18 +168,34 @@
   </section>
 
   <!-- ROSTER -->
-  <section id="rosterTab" class="panel">
-    <div class="panel-head">
-      <h2>Roster Management</h2>
-      <div>
-        <button id="rosterAddUserBtn" class="primary">Add User</button>
-        <button id="rosterSaveBtn" class="ghost">Save</button>
-        <button id="rosterReloadBtn" class="ghost">Reload</button>
-      </div>
-    </div>
-    <div id="roster"></div>
-  </section>
+ <section id="rosterTab" class="panel">
+  <div class="panel-head">
+    <h2>Roster Management</h2>
+    <div class="panel-actions">
+      <button id="rosterAddUserBtn" class="primary">Add User</button>
+      <button id="rosterSaveBtn" class="ghost">Save</button>
+      <button id="rosterReloadBtn" class="ghost">Reload</button>
 
+      <!-- BULK UPLOAD -->
+      <label class="ghost file-btn">
+        Bulk Upload (CSV / Excel)
+        <input
+          id="rosterUploadInput"
+          type="file"
+          accept=".csv,.xlsx"
+          hidden
+        />
+      </label>
+    </div>
+  </div>
+
+  <div class="small subtle" style="margin-bottom:10px">
+    CSV/Excel columns required:
+    <b>department, name, email, phone</b>
+  </div>
+
+  <div id="roster"></div>
+</section>
   <!-- AUTO-GEN -->
   <section id="autogenTab" class="panel">
     <h2>Auto-Generate Schedule</h2>
