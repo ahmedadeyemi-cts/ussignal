@@ -741,7 +741,11 @@ function isCurrentOnCall(entry) {
   const end = isoToDateLocalAssumed(entry.endISO);
   return now >= start && now < end;
 }
-
+function isPastOnCall(entry) {
+  const now = new Date();
+  const end = isoToDateLocalAssumed(entry.endISO);
+  return now >= end;
+}
 /* =========================
  * Overlap Detection + Auto Conflict Resolution
  * ========================= */
@@ -1181,9 +1185,11 @@ function renderScheduleAdmin(el) {
     const endInput = (e.endISO || "").slice(0, 16);
 
     el.innerHTML += `
-      <div class="schedule-card
-     ${e._autoResolved ? "resolved" : ""}
-     ${isCurrentOnCall(e) ? "current-oncall" : ""}">
+     <div class="schedule-card
+ ${e._autoResolved ? "resolved" : ""}
+ ${isCurrentOnCall(e) ? "current-oncall" : ""}
+ ${isPastOnCall(e) ? "past-week" : ""}">
+
         <div class="card-head">
           <div>
             ${
