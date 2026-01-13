@@ -1232,7 +1232,12 @@ function renderScheduleAdmin(el) {
           </div>
 
           <div class="card-actions">
-            ${isAdmin ? `<button class="ghost" data-action="notifyEntry" data-id="${escapeHtml(String(e.id))}">Notify</button>` : ``}
+            ${isAdmin && !isPastOnCall(e)
+  ? `<button class="ghost" data-action="notifyEntry" data-id="${escapeHtml(String(e.id))}">
+       Notify
+     </button>`
+  : ``}
+
             ${
               ${canEdit && !isPast
   ? `<button class="primary" data-action="${editing ? "done" : "edit"}" data-id="${escapeHtml(String(e.id))}">
@@ -1274,6 +1279,28 @@ function renderScheduleAdmin(el) {
         return;
       }
       if (action === "notifyEntry") {
+  const entry = APP_STATE.scheduleFull?.entries?.find(e => String(e.id) === String(id));
+  if (!entry || isPastOnCall(entry)) {
+    toast("Cannot notify for past on-call weeks.");
+    return;
+  }
+
+  confirmModal(
+    "Notify This Week",
+    "Send start and end notifications for this entry?",
+    async () => {
+      const res = await fetchAuth(`/api/admin/oncall/notify`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ mode: "both", entryId: id })
+      });
+      if (!res.ok) throw new Error(await res.text());
+      toast("Notifications sent.");
+    }
+  );
+  return;
+}
+
         confirmModal(
           "Notify This Week",
           "Send start and end notifications for this entry?",
@@ -1930,10 +1957,18 @@ function refreshTimeline() {
   const timeline = byId("timeline");
   if (!timeline) return;
 
-  let entries =
-  (APP_STATE.draftSchedule && APP_STATE.draftSchedule.entries) ||
-  (APP_STATE.schedulePublic && APP_STATE.schedulePublic.entries) ||
-  [];
+  let entries = [];
+
+if (APP_STATE.draftSchedule?.entries) {
+  entries = APP_STATE.draftSchedule.entries.map(e => {
+    // Freeze past entries to original schedule
+    const original = APP_STATE.scheduleFull?.entries?.find(o => o.id === e.id);
+    return original && isPastOnCall(original) ? original : e;
+  });
+} else if (APP_STATE.schedulePublic?.entries) {
+  entries = APP_STATE.schedulePublic.entries;
+}
+
 
 if (APP_STATE.dept !== "all" && DEPT_KEYS.includes(APP_STATE.dept)) {
   entries = entries.map(e => ({
@@ -1963,8 +1998,12 @@ function renderTimeline(el, entries) {
     const endDisp = formatCSTFromChicagoLocal(e.endISO);
 
     const row = document.createElement("div");
-   const holiday = getHolidayName(isoToDateLocalAssumed(e.startISO));
-    row.className = "timeline-row-wrap" + (holiday ? " holiday-week" : "");
+  const past = isPastOnCall(e);
+row.className =
+  "timeline-row-wrap" +
+  (holiday ? " holiday-week" : "") +
+  (past ? " timeline-past" : "");
+
     row.innerHTML = `
       <div class="timeline-left">
         <div class="week-label">${escapeHtml(startLabel)}</div>
