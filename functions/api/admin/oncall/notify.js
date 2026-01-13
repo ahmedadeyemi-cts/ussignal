@@ -1,132 +1,120 @@
 export async function onRequest({ request, env }) {
-  // -----------------------------
-  // Method guard
-  // -----------------------------
-  if (request.method !== "POST") {
-    return new Response("Method Not Allowed", { status: 405 });
-  }
-
-  // -----------------------------
-  // Cloudflare Access auth
-  // -----------------------------
-  const jwt = request.headers.get("cf-access-jwt-assertion");
-  const actor =
-    request.headers.get("cf-access-authenticated-user-email") || "unknown";
-
-  if (!jwt) {
-    return new Response("Unauthorized", { status: 401 });
-  }
-
-  // -----------------------------
-  // Read body (mode + optional entryId)
-  // -----------------------------
-  let body = {};
   try {
-    body = await request.json();
-  } catch {}
+    // -------------------------------
+    // Auth
+    // -------------------------------
+    const jwt = request.headers.get("cf-access-jwt-assertion");
+    if (!jwt) {
+      return json({ error: "Unauthorized" }, 401);
+    }
 
-  const mode = (body.mode || "both").toLowerCase(); // start | end | both
-  const entryId = body.entryId || null;
+    // -------------------------------
+    // Load schedule
+    // -------------------------------
+    const raw = await env.ONCALL_KV.get("ONCALL:CURRENT");
+    if (!raw) {
+      return json({ error: "No schedule found" }, 400);
+    }
 
-  // -----------------------------
-  // Load schedule
-  // -----------------------------
-  const raw = await env.ONCALL_KV.get("ONCALL:CURRENT");
-  if (!raw) {
-    return json({ error: "No schedule found" }, 400);
-  }
+    const schedule = JSON.parse(raw);
+    const entries = schedule.entries || [];
 
-  const schedule = JSON.parse(raw);
-  let entries = schedule.entries || [];
+    if (!entries.length) {
+      return json({ error: "No entries to notify" }, 400);
+    }
 
-  if (entryId) {
-    entries = entries.filter(e => String(e.id) === String(entryId));
-  }
+    // -------------------------------
+    // Determine CURRENT on-call
+    // -------------------------------
+    const now = new Date();
 
-  if (!entries.length) {
-    return json({ error: "No matching entries to notify" }, 400);
-  }
+    const active = entries.filter(e => {
+      const start = new Date(e.startISO);
+      const end = new Date(e.endISO);
+      return now >= start && now <= end;
+    });
 
-  // -----------------------------
-  // Brevo config
-  // -----------------------------
-  if (!env.BREVO_API_KEY) {
-    return json({ error: "BREVO_API_KEY not configured" }, 500);
-  }
+    if (!active.length) {
+      return json({ error: "No active on-call entry" }, 400);
+    }
 
-  const senderEmail = env.BREVO_SENDER_EMAIL || "noreply@oncall.onenecklab.com";
-  const senderName = env.BREVO_SENDER_NAME || "On-Call Scheduler";
+    // -------------------------------
+    // Build recipients + content
+    // -------------------------------
+    const admins = env.ADMIN_NOTIFICATION
+      .split(",")
+      .map(e => e.trim())
+      .filter(Boolean);
 
-  // -----------------------------
-  // Send notifications
-  // -----------------------------
-  let sent = 0;
+    const portal = env.PUBLIC_PORTAL_URL;
 
-  for (const entry of entries) {
-    const start = entry.startISO;
-    const end = entry.endISO;
-    const departments = entry.departments || {};
+    let emailsSent = 0;
 
-    for (const dept of Object.keys(departments)) {
-      const person = departments[dept];
-      if (!person?.email) continue;
+    for (const entry of active) {
+      const to = [];
+      const teamLines = [];
 
-      const subject =
-        mode === "start"
-          ? `On-Call Begins (${start})`
-          : mode === "end"
-          ? `On-Call Ends (${end})`
-          : `On-Call Assignment (${start} → ${end})`;
+      for (const [team, person] of Object.entries(entry.departments || {})) {
+        if (!person?.email) continue;
+
+        to.push({
+          email: person.email,
+          name: person.name || team
+        });
+
+        teamLines.push(
+          `<li><strong>${team}</strong>: ${person.name} (${person.email})</li>`
+        );
+      }
+
+      if (!to.length) continue;
 
       const html = `
-        <p>Hello ${person.name || ""},</p>
-        <p>You have an on-call assignment.</p>
-        <ul>
-          <li><b>Department:</b> ${dept}</li>
-          <li><b>Start:</b> ${start}</li>
-          <li><b>End:</b> ${end}</li>
-        </ul>
-        <p>Please ensure availability.</p>
+        <p>Hello,</p>
+        <p>You are currently on call.</p>
+
+        <ul>${teamLines.join("")}</ul>
+
+        <p>
+          View the full on-call schedule:
+          <a href="${portal}">${portal}</a>
+        </p>
       `;
 
       await sendBrevo(env, {
-        senderEmail,
-        senderName,
-        to: person.email,
-        subject,
+        to,
+        cc: admins,
+        subject: "You Are Currently On Call",
         html
       });
 
-      sent++;
+      emailsSent++;
     }
+
+    // -------------------------------
+    // Audit
+    // -------------------------------
+    await audit(env, {
+      action: "MANUAL_NOTIFY",
+      entries: active.length,
+      emailsSent
+    });
+
+    return json({ ok: true, emailsSent });
+
+  } catch (err) {
+    // THIS is what was missing before
+    console.error("NOTIFY ERROR:", err);
+    return json(
+      { error: "Notify failed", detail: err.message },
+      500
+    );
   }
-
-  // -----------------------------
-  // Audit log
-  // -----------------------------
-  const audit = (await env.ONCALL_KV.get("ONCALL:AUDIT")) || "[]";
-  const auditLog = JSON.parse(audit);
-
-  auditLog.unshift({
-    ts: new Date().toISOString(),
-    actor,
-    action: "NOTIFY",
-    mode,
-    entryId: entryId || "ALL",
-    sent
-  });
-
-  await env.ONCALL_KV.put(
-    "ONCALL:AUDIT",
-    JSON.stringify(auditLog.slice(0, 500))
-  );
-
-  return json({ ok: true, sent });
 }
 
-/* ============================= */
+/* ================================================= */
 
-async function sendBrevo(env, { senderEmail, senderName, to, subject, html }) {
+async function sendBrevo(env, { to, cc, subject, html }) {
   const res = await fetch("https://api.brevo.com/v3/smtp/email", {
     method: "POST",
     headers: {
@@ -134,25 +122,42 @@ async function sendBrevo(env, { senderEmail, senderName, to, subject, html }) {
       "api-key": env.BREVO_API_KEY
     },
     body: JSON.stringify({
-      sender: { email: senderEmail, name: senderName },
-      to: [{ email: to }],
+      sender: {
+        email: env.BREVO_SENDER_EMAIL,
+        name: env.BREVO_SENDER_NAME
+      },
+      to,
+      cc: cc.map(email => ({ email })),
       subject,
       htmlContent: html
     })
   });
 
   if (!res.ok) {
-    const msg = await res.text();
-    throw new Error(`Brevo error ${res.status}: ${msg}`);
+    const text = await res.text();
+    throw new Error(`Brevo error: ${text}`);
   }
+}
+
+async function audit(env, record) {
+  const raw = (await env.ONCALL_KV.get("ONCALL:AUDIT")) || "[]";
+  const audit = JSON.parse(raw);
+
+  audit.unshift({
+    ts: new Date().toISOString(),
+    actor: "admin",
+    ...record
+  });
+
+  await env.ONCALL_KV.put(
+    "ONCALL:AUDIT",
+    JSON.stringify(audit.slice(0, 500))
+  );
 }
 
 function json(obj, status = 200) {
   return new Response(JSON.stringify(obj), {
     status,
-    headers: {
-      "content-type": "application/json",
-      "cache-control": "no-store"
-    }
+    headers: { "content-type": "application/json" }
   });
 }
