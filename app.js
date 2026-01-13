@@ -1281,7 +1281,7 @@ function renderScheduleAdmin(el) {
         renderScheduleAdmin(el);
         return;
       }
-      if (action === "notifyEntry") {
+   if (action === "notifyEntry") {
   const entry = APP_STATE.scheduleFull?.entries?.find(e => String(e.id) === String(id));
   if (!entry || isPastOnCall(entry)) {
     toast("Cannot notify for past on-call weeks.");
