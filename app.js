@@ -239,6 +239,14 @@ APP_STATE.allowedDepartments = Array.isArray(ctx?.departments)
   ));
 
   onClick("auditRefreshBtn", loadAudit);
+  // =========================
+  // Bulk Upload / Download wiring
+  // =========================
+  wireRosterBulkUpload();
+  wireScheduleBulkUpload();
+
+  onClick("rosterDownloadBtn", downloadRosterCSV);
+  onClick("scheduleDownloadBtn", downloadScheduleCSV);
 
     // =========================
   // FINALIZE UI FIRST (SAFE)
@@ -1050,6 +1058,65 @@ function normalizeScheduleEntriesFromBulk(rows) {
 
   return Array.from(map.values());
 }
+function wireScheduleBulkUpload() {
+  const input = byId("scheduleUploadInput");
+  if (!input) return;
+
+  input.onchange = async () => {
+    const file = input.files?.[0];
+    if (!file) return;
+
+    const rows = await parseSpreadsheet(file);
+    const incoming = normalizeScheduleEntriesFromBulk(rows);
+
+    const preview = [];
+    const warnings = [];
+    const draft = deepClone(APP_STATE.draftSchedule);
+
+    incoming.forEach(ne => {
+      const conflict = detectOverlaps([...draft.entries, ne]);
+      if (conflict.length) {
+        warnings.push(`Conflict detected for ${ne.startISO}`);
+      }
+
+      const existing = draft.entries.find(e =>
+        e.startISO === ne.startISO && e.endISO === ne.endISO
+      );
+
+      if (existing) {
+        preview.push(`UPDATE ${ne.startISO}`);
+        Object.assign(existing.departments, ne.departments);
+      } else {
+        preview.push(`ADD ${ne.startISO}`);
+        draft.entries.push(ne);
+      }
+    });
+
+    showModal(
+      "Schedule Upload Preview (Dry-Run)",
+      `
+        <div class="small"><b>Changes:</b></div>
+        <ul>${preview.map(p => `<li>${escapeHtml(p)}</li>`).join("")}</ul>
+        ${warnings.length ? `<div class="small" style="color:#ef4444"><b>Conflicts:</b><ul>${warnings.map(w => `<li>${escapeHtml(w)}</li>`).join("")}</ul></div>` : ""}
+        <div class="small subtle">No data has been saved yet.</div>
+      `,
+      "Apply",
+      async () => {
+        APP_STATE.draftSchedule = draft;
+        renderScheduleAdmin(byId("schedule"));
+        refreshTimeline();
+        HAS_UNSAVED_CHANGES = true;
+        updateSaveState();
+        toast("Schedule changes applied (not saved).");
+        return true;
+      },
+      "Cancel"
+    );
+
+    input.value = "";
+  };
+}
+
 /* =========================
  * Admin Schedule (Editor/Admin)
  * ========================= */
@@ -1286,6 +1353,69 @@ el.querySelectorAll("select[data-field='email']").forEach(sel => {
 function deepClone(obj) {
   return JSON.parse(JSON.stringify(obj));
 }
+/* =========================
+ * Bulk Upload Helpers
+ * ========================= */
+
+function normalizeEmail(e) {
+  return String(e || "").trim().toLowerCase();
+}
+
+async function parseSpreadsheet(file) {
+  const name = file.name.toLowerCase();
+
+  if (name.endsWith(".csv")) {
+    const text = await file.text();
+    const [header, ...lines] = text.split(/\r?\n/).filter(Boolean);
+    const headers = header.split(",").map(h => h.trim().toLowerCase());
+
+    return lines.map(line => {
+      const cols = line.split(",");
+      const row = {};
+      headers.forEach((h, i) => row[h] = (cols[i] || "").trim());
+      return row;
+    });
+  }
+
+  if (name.endsWith(".xlsx")) {
+    if (!window.XLSX) {
+      throw new Error("XLSX library not loaded.");
+    }
+    const data = await file.arrayBuffer();
+    const wb = XLSX.read(data);
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    return XLSX.utils.sheet_to_json(ws, { defval: "" });
+  }
+
+  throw new Error("Unsupported file type.");
+}
+
+function downloadCSV(filename, rows) {
+  if (!rows.length) {
+    toast("Nothing to download.");
+    return;
+  }
+
+  const headers = Object.keys(rows[0]);
+  const csv = [
+    headers.join(","),
+    ...rows.map(r =>
+      headers.map(h =>
+        `"${String(r[h] ?? "").replace(/"/g, '""')}"`
+      ).join(",")
+    )
+  ].join("\n");
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 
 /* =========================
  * Save / Notify / Export / ICS
@@ -1404,6 +1534,35 @@ async function showDiffAndSave() {
     },
     "Cancel"
   );
+}
+function downloadRosterCSV() {
+  const rows = [];
+  Object.entries(APP_STATE.roster || {}).forEach(([dep, users]) => {
+    users.forEach(u => rows.push({
+      department: dep,
+      name: u.name,
+      email: u.email,
+      phone: u.phone
+    }));
+  });
+  downloadCSV("roster.csv", rows);
+}
+
+function downloadScheduleCSV() {
+  const rows = [];
+  (APP_STATE.scheduleFull?.entries || []).forEach(e => {
+    Object.entries(e.departments || {}).forEach(([dep, p]) => {
+      rows.push({
+        startISO: e.startISO,
+        endISO: e.endISO,
+        team: dep,
+        name: p.name,
+        email: p.email,
+        phone: p.phone
+      });
+    });
+  });
+  downloadCSV("schedule.csv", rows);
 }
 
 async function exportExcel() {
@@ -1620,6 +1779,73 @@ async function saveRoster() {
   HAS_UNSAVED_CHANGES = false;      // ✅ ADD THIS
   updateSaveState?.();              // ✅ OPTIONAL but recommended
   await loadRoster();
+}
+function wireRosterBulkUpload() {
+  const input = byId("rosterUploadInput");
+  if (!input) return;
+
+  input.onchange = async () => {
+    const file = input.files?.[0];
+    if (!file) return;
+
+    const rows = await parseSpreadsheet(file);
+    const preview = [];
+    const warnings = [];
+
+    const draft = deepClone(APP_STATE.roster || {});
+
+    rows.forEach((r, i) => {
+      const dept = r.department || r.dept;
+      if (!DEPT_KEYS.includes(dept)) {
+        warnings.push(`Row ${i + 1}: invalid department`);
+        return;
+      }
+
+      const email = normalizeEmail(r.email);
+      if (!email) {
+        warnings.push(`Row ${i + 1}: missing email`);
+        return;
+      }
+
+      draft[dept] ||= [];
+      const existing = draft[dept].find(u => normalizeEmail(u.email) === email);
+
+      if (existing) {
+        preview.push(`UPDATE ${email} (${dept})`);
+        existing.name = r.name || existing.name;
+        existing.phone = r.phone || existing.phone;
+      } else {
+        preview.push(`ADD ${email} (${dept})`);
+        draft[dept].push({
+          name: r.name || "",
+          email,
+          phone: r.phone || ""
+        });
+      }
+    });
+
+    showModal(
+      "Roster Upload Preview (Dry-Run)",
+      `
+        <div class="small"><b>Changes:</b></div>
+        <ul>${preview.map(p => `<li>${escapeHtml(p)}</li>`).join("")}</ul>
+        ${warnings.length ? `<div class="small" style="color:#f59e0b"><b>Warnings:</b><ul>${warnings.map(w => `<li>${escapeHtml(w)}</li>`).join("")}</ul></div>` : ""}
+        <div class="small subtle">No data has been saved yet.</div>
+      `,
+      "Apply",
+      async () => {
+        APP_STATE.roster = draft;
+        renderRoster();
+        HAS_UNSAVED_CHANGES = true;
+        updateSaveState();
+        toast("Roster changes applied (not saved).");
+        return true;
+      },
+      "Cancel"
+    );
+
+    input.value = "";
+  };
 }
 
 /* =========================
