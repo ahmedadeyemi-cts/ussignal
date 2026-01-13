@@ -11,6 +11,7 @@
 // - Audit log viewer
 // - Calendar timeline UI
 // - ICS export (download .ics from worker endpoint)
+//Adding Download and upload options
 // ======================================================
 
 "use strict";
