@@ -1176,7 +1176,9 @@ function renderScheduleAdmin(el) {
 
 
   entries.forEach(e => {
-    const editing = APP_STATE.editingEntryIds.has(String(e.id));
+    const isPast = isPastOnCall(e);
+    const editing =
+    !isPast && APP_STATE.editingEntryIds.has(String(e.id));
 
     const startDisplay = formatCSTFromChicagoLocal(e.startISO);
     const endDisplay = formatCSTFromChicagoLocal(e.endISO);
@@ -1232,12 +1234,14 @@ function renderScheduleAdmin(el) {
           <div class="card-actions">
             ${isAdmin ? `<button class="ghost" data-action="notifyEntry" data-id="${escapeHtml(String(e.id))}">Notify</button>` : ``}
             ${
-              canEdit
-                ? `<button class="primary" data-action="${editing ? "done" : "edit"}" data-id="${escapeHtml(String(e.id))}">
-                    ${editing ? "Done" : "Edit"}
-                  </button>`
-                : ``
-            }
+              ${canEdit && !isPast
+  ? `<button class="primary" data-action="${editing ? "done" : "edit"}" data-id="${escapeHtml(String(e.id))}">
+      ${editing ? "Done" : "Edit"}
+    </button>`
+  : isPast
+    ? `<span class="small subtle">Locked</span>`
+    : ``
+}
           </div>
         </div>
 
@@ -1253,11 +1257,17 @@ function renderScheduleAdmin(el) {
       const action = btn.getAttribute("data-action");
       const id = btn.getAttribute("data-id");
 
-      if (action === "edit") {
-        APP_STATE.editingEntryIds.add(String(id));
-        renderScheduleAdmin(el);
-        return;
-      }
+     if (action === "edit") {
+  const entry = APP_STATE.draftSchedule?.entries?.find(e => String(e.id) === String(id));
+  if (!entry || isPastOnCall(entry)) {
+    toast("Past on-call weeks cannot be edited.");
+    return;
+  }
+  APP_STATE.editingEntryIds.add(String(id));
+  renderScheduleAdmin(el);
+  return;
+}
+
       if (action === "done") {
         APP_STATE.editingEntryIds.delete(String(id));
         renderScheduleAdmin(el);
@@ -1431,6 +1441,15 @@ function downloadCSV(filename, rows) {
 async function saveAllChanges() {
   const canEdit = roleAtLeast(APP_STATE.role, "editor");
   const isAdmin = roleAtLeast(APP_STATE.role, "admin");
+  for (const e of (APP_STATE.draftSchedule.entries || [])) {
+  const original = APP_STATE.scheduleFull?.entries?.find(o => String(o.id) === String(e.id));
+  if (original && isPastOnCall(original)) {
+    if (JSON.stringify(original) !== JSON.stringify(e)) {
+      toast(`Entry ${e.id} is in the past and cannot be modified.`, 5000);
+      return;
+    }
+  }
+}
 
   if (!canEdit) {
     toast("You do not have permission to save changes.");
