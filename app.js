@@ -1364,15 +1364,16 @@ ${
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ mode: "both", entryId: id })
       });
-      APP_STATE.notifyStatus[id] = {
-  sentAt: new Date().toISOString(),
-  mode: "both"
-};
+  if (!res.ok) throw new Error(await res.text());
 
-renderScheduleAdmin(el);
+    APP_STATE.notifyStatus[id] = {
+    sentAt: new Date().toISOString(),
+    mode: "both"
+  };
 
-      if (!res.ok) throw new Error(await res.text());
-      toast("Notifications sent.");
+    renderScheduleAdmin(el);
+    toast("Notifications sent.");
+
     }
   );
   return;
