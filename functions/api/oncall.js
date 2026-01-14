@@ -1,40 +1,31 @@
-//export async function onRequest() {
-  //return new Response(JSON.stringify({ entries: [] }), {
-    //headers: { "content-type": "application/json" }
-  //});
-//}
-
-
 export async function onRequest({ env }) {
   try {
     // -----------------------------------
-    // Load CURRENT on-call (public-safe)
+    // Load CURRENT on-call schedule
+    // (public-safe, read-only)
     // -----------------------------------
-    const rawCurrent = await env.ONCALL_KV.get("ONCALL:CURRENT");
-    const current = rawCurrent ? JSON.parse(rawCurrent) : null;
+    const raw = await env.ONCALL_KV.get("ONCALL:CURRENT");
 
-    // -----------------------------------
-    // Load schedule (for timeline view)
-    // -----------------------------------
-    const rawSchedule = await env.ONCALL_KV.get("ONCALL:SCHEDULE");
-    const schedule = rawSchedule ? JSON.parse(rawSchedule) : null;
+    const schedule = raw
+      ? JSON.parse(raw)
+      : { entries: [] };
 
     return new Response(
       JSON.stringify({
-        ok: true,
-        current,                 // single active entry (or null)
-        schedule: schedule
-          ? {
-              tz: schedule.tz,
-              updatedAt: schedule.updatedAt,
-              entries: schedule.entries
-            }
-          : null
+        schedule: {
+          tz: schedule.tz || "America/Chicago",
+          updatedAt: schedule.updatedAt || null,
+          entries: Array.isArray(schedule.entries)
+            ? schedule.entries
+            : []
+        }
       }),
       {
         headers: {
           "content-type": "application/json",
+          // Prevent stale rotations from being cached
           "cache-control": "no-store",
+          // Public endpoint (no Access, no auth)
           "access-control-allow-origin": "*"
         }
       }
@@ -45,7 +36,7 @@ export async function onRequest({ env }) {
 
     return new Response(
       JSON.stringify({
-        ok: false,
+        schedule: { entries: [] },
         error: "Failed to load on-call data"
       }),
       {
