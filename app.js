@@ -2048,14 +2048,14 @@ function refreshTimeline() {
 
   let entries = [];
 
+let entries = [];
+
 if (APP_STATE.publicMode) {
-  entries = APP_STATE.draftSchedule.entries.map(e => {
-    // Freeze past entries to original schedule
-    const original = APP_STATE.scheduleFull?.entries?.find(o => o.id === e.id);
-    return original && isPastOnCall(original) ? original : e;
-  });
-} else if (APP_STATE.schedulePublic?.entries) {
-  entries = APP_STATE.schedulePublic.entries;
+  entries = APP_STATE.schedulePublic?.entries || [];
+} else if (APP_STATE.draftSchedule?.entries) {
+  entries = APP_STATE.draftSchedule.entries;
+} else if (APP_STATE.scheduleFull?.entries) {
+  entries = APP_STATE.scheduleFull.entries;
 }
 
 
