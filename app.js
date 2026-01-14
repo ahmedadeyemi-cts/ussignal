@@ -308,7 +308,7 @@ if (byId("roster")) {
     toast("Unable to load roster.", 5000);
   }
 }
-}
+
 async function reloadSchedule() {
   const el = byId("schedule");
   if (!el) return;
