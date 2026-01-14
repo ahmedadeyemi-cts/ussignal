@@ -31,6 +31,9 @@ let APP_STATE = {
 
    // 🔴 ADD THIS
   publicMode: false,
+    // notification state
+  notifyStatus: {}, // entryId -> { sentAt, mode }
+
 
   // ui state
   dept: "all",
@@ -1193,6 +1196,16 @@ async function loadScheduleAdmin(el) {
   APP_STATE.scheduleFull = data;
   APP_STATE.draftSchedule = deepClone(data);
   APP_STATE.editingEntryIds.clear();
+ APP_STATE.notifyStatus = {};
+
+(data.entries || []).forEach(e => {
+  if (e.notifiedAt) {
+    APP_STATE.notifyStatus[e.id] = {
+      sentAt: e.notifiedAt,
+      mode: e.notifyMode || "both"
+    };
+  }
+});
 
   renderScheduleAdmin(el);
   refreshTimeline();
@@ -1277,6 +1290,12 @@ function renderScheduleAdmin(el) {
     })()
   }
 </div>
+${
+  APP_STATE.notifyStatus[e.id]
+    ? `<span class="notify-badge notified">🔔 Notified</span>`
+    : `<span class="notify-badge pending">⏳ Not Notified</span>`
+}
+
 
                   <div class="small subtle">CST</div>
                 `
@@ -1345,6 +1364,13 @@ function renderScheduleAdmin(el) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ mode: "both", entryId: id })
       });
+      APP_STATE.notifyStatus[id] = {
+  sentAt: new Date().toISOString(),
+  mode: "both"
+};
+
+renderScheduleAdmin(el);
+
       if (!res.ok) throw new Error(await res.text());
       toast("Notifications sent.");
     }
