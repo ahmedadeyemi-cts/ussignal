@@ -1,7 +1,7 @@
 export async function onRequest({ request, env }) {
   try {
     // -------------------------------
-    // Auth
+    // Auth (ADMIN ONLY)
     // -------------------------------
     const jwt = request.headers.get("cf-access-jwt-assertion");
     if (!jwt) {
@@ -12,18 +12,18 @@ export async function onRequest({ request, env }) {
     // Parse body
     // -------------------------------
     const body = await request.json();
-    const next = body?.schedule;
+    const schedule = body?.schedule;
 
-    if (!next || !Array.isArray(next.entries)) {
+    if (!schedule || !Array.isArray(schedule.entries)) {
       return json({ error: "Invalid schedule payload" }, 400);
     }
 
     const now = new Date();
 
     // -------------------------------
-    // Archive past entries (ONCE)
+    // Archive past entries (immutable)
     // -------------------------------
-    for (const entry of next.entries) {
+    for (const entry of schedule.entries) {
       if (!entry?.id || !entry?.endISO) continue;
 
       const end = new Date(entry.endISO);
@@ -45,31 +45,43 @@ export async function onRequest({ request, env }) {
     }
 
     // -------------------------------
-    // OPTIONAL: prune archived entries
-    // (uncomment if you want CURRENT = future + active only)
+    // Save FULL schedule (admin use)
     // -------------------------------
-    /*
-    next.entries = next.entries.filter(e => {
-      const end = new Date(e.endISO);
-      return end >= now;
-    });
-    */
-
-    // -------------------------------
-    // Finalize schedule
-    // -------------------------------
-    const finalized = {
-      version: next.version ?? 1,
-      tz: next.tz ?? "America/Chicago",
+    const finalizedSchedule = {
+      version: schedule.version ?? 1,
+      tz: schedule.tz ?? "America/Chicago",
       updatedAt: new Date().toISOString(),
       updatedBy: "admin",
-      entries: next.entries
+      entries: schedule.entries
     };
 
     await env.ONCALL_KV.put(
-      "ONCALL:CURRENT",
-      JSON.stringify(finalized)
+      "ONCALL:SCHEDULE",
+      JSON.stringify(finalizedSchedule)
     );
+
+    // -------------------------------
+    // Derive CURRENT on-call entry
+    // -------------------------------
+    const currentEntry = schedule.entries.find(e => {
+      if (!e?.startISO || !e?.endISO) return false;
+      const start = new Date(e.startISO);
+      const end = new Date(e.endISO);
+      return now >= start && now < end;
+    });
+
+    if (currentEntry) {
+      await env.ONCALL_KV.put(
+        "ONCALL:CURRENT",
+        JSON.stringify({
+          ...currentEntry,
+          computedAt: new Date().toISOString()
+        })
+      );
+    } else {
+      // Optional: clear current if nothing active
+      await env.ONCALL_KV.delete("ONCALL:CURRENT");
+    }
 
     return json({ ok: true });
 
