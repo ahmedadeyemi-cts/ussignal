@@ -324,6 +324,8 @@ async function reloadSchedule() {
     await loadSchedulePublic(el);
   }
 }
+} // ✅ END initApp
+
 /* =========================
  * Disable Save button until dirty
  * ========================= */
