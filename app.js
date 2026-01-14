@@ -17,6 +17,35 @@
 "use strict";
 const THEME_KEY = "oncall-theme";
 
+/* =========================
+ * Global App State
+ * ========================= */
+
+let APP_STATE = {
+  // identity / permissions
+  isAuthenticated: false,
+  admin: false,
+  role: "viewer",
+  email: "",
+  allowedDepartments: [],
+
+   // 🔴 ADD THIS
+  publicMode: false,
+
+  // ui state
+  dept: "all",
+  scheduleFull: null,
+  schedulePublic: null,
+  draftSchedule: null,
+  editingEntryIds: new Set(),
+
+  // roster state
+  roster: null,
+
+  // timeline state
+  timelineMode: "weeks"
+};
+
 // Cloudflare Worker Path (same-origin — required for Cloudflare Access cookie auth)
 // SAME ORIGIN — required for Pages Functions + Access
 const API_BASE = "";
@@ -94,10 +123,10 @@ function getHolidayName(date) {
  * Expect ctx from admin.html:
  *   { admin: true, role: "admin"|"editor"|"viewer", email: "...", departments: ["enterprise_network", ...] }
  */
-const isExplicitPublic = ctx?.publicMode === true || ctx?.public === true;
-const isExplicitAdmin  = ctx?.admin === true || ctx?.mode === "admin";
+//const isExplicitPublic = ctx?.publicMode === true || ctx?.public === true;
+//const isExplicitAdmin  = ctx?.admin === true || ctx?.mode === "admin";
 
-APP_STATE.publicMode = isExplicitPublic || !isExplicitAdmin;
+//APP_STATE.publicMode = isExplicitPublic || !isExplicitAdmin;
 
 const ROLE_ORDER = ["viewer", "editor", "admin"];
 function roleAtLeast(role, needed) {
@@ -111,34 +140,6 @@ window.addEventListener("beforeunload", (e) => {
   e.returnValue = "";
 });
 
-/* =========================
- * Global App State
- * ========================= */
-
-let APP_STATE = {
-  // identity / permissions
-  isAuthenticated: false,
-  admin: false,
-  role: "viewer",
-  email: "",
-  allowedDepartments: [],
-
-   // 🔴 ADD THIS
-  publicMode: false,
-
-  // ui state
-  dept: "all",
-  scheduleFull: null,
-  schedulePublic: null,
-  draftSchedule: null,
-  editingEntryIds: new Set(),
-
-  // roster state
-  roster: null,
-
-  // timeline state
-  timelineMode: "weeks"
-};
 
 /* =========================
  * Fetch helpers (same-origin + Access)
@@ -169,42 +170,37 @@ async function fetchPublic(path, opts = {}) {
 /* =========================
  * Init
  * ========================= */
-
 async function initApp(ctx = {}) {
 
-  // =========================
-  // PUBLIC MODE DETECTION (NEW)
-  // =========================
-  APP_STATE.publicMode = (ctx?.publicMode === true) || (ctx?.public === true);
+  // 🔐 Determine mode
+  const isPublic =
+    ctx.publicMode === true ||
+    ctx.public === true ||
+    (!ctx.admin && !ctx.email);
 
-  if (APP_STATE.publicMode) {
-    // 🔓 Public page (index.html)
+  APP_STATE.publicMode = isPublic;
+
+  if (isPublic) {
+    // 🔓 Public view
     APP_STATE.isAuthenticated = false;
     APP_STATE.admin = false;
     APP_STATE.role = "viewer";
     APP_STATE.email = "";
     APP_STATE.allowedDepartments = DEPT_KEYS.slice();
   } else {
-    // =========================
-    // AUTH FROM CLOUDFLARE ACCESS (ADMIN)
-    // =========================
-    APP_STATE.isAuthenticated = !!ctx?.email;
-    APP_STATE.admin = ctx?.role === "admin";
-    APP_STATE.role = ctx?.role || "viewer";
-    APP_STATE.email = ctx?.email || "";
-
-    APP_STATE.allowedDepartments = Array.isArray(ctx?.departments)
+    // 🔐 Admin view (Cloudflare Access)
+    APP_STATE.isAuthenticated = true;
+    APP_STATE.admin = ctx.role === "admin";
+    APP_STATE.role = ctx.role || "viewer";
+    APP_STATE.email = ctx.email || "";
+    APP_STATE.allowedDepartments = Array.isArray(ctx.departments)
       ? ctx.departments
       : DEPT_KEYS.slice();
   }
 
-
-if (!APP_STATE.publicMode) {
-  APP_STATE.email = ctx?.email || "";
-  APP_STATE.allowedDepartments = Array.isArray(ctx?.departments)
-    ? ctx.departments
-    : DEPT_KEYS.slice();
+  // continue with UI wiring...
 }
+
    // =========================
   // Role Badge
   // =========================
@@ -630,22 +626,6 @@ function applyRBACToUI() {
   setHidden("notifyBtn", !isAdmin);
   setHidden("exportBtn", !isAdmin);
 
-  setHidden("rosterTabBtn", !isAdmin);
-  setHidden("autogenTabBtn", !isAdmin);
-  setHidden("auditTabBtn", !isAdmin);
-}
-
-function applyRBACToUI() {
-  const canEdit = roleAtLeast(APP_STATE.role, "editor");
-  const isAdmin = roleAtLeast(APP_STATE.role, "admin");
-
-  setHidden("saveAllBtn", !canEdit);
-  setHidden("addScheduleBtn", !canEdit);
-  setHidden("revertBtn", !isAdmin);
-  setHidden("notifyBtn", !isAdmin);
-  setHidden("exportBtn", !isAdmin);
-
-  // Optional tab button IDs if you add them; safe no-ops otherwise
   setHidden("rosterTabBtn", !isAdmin);
   setHidden("autogenTabBtn", !isAdmin);
   setHidden("auditTabBtn", !isAdmin);
