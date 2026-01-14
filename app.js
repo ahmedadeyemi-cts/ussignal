@@ -1343,41 +1343,52 @@ ${
   return;
 }
 
-      if (action === "done") {
-        APP_STATE.editingEntryIds.delete(String(id));
-        renderScheduleAdmin(el);
-        return;
-      }
-   if (action === "notifyEntry") {
+if (action === "done") {
+  APP_STATE.editingEntryIds.delete(String(id));
+  renderScheduleAdmin(el);
+  return;
+}
+
+if (action === "notifyEntry") {
   const entry = APP_STATE.scheduleFull?.entries?.find(e => String(e.id) === String(id));
   if (!entry || isPastOnCall(entry)) {
     toast("Cannot notify for past on-call weeks.");
     return;
   }
 
+  const already = APP_STATE.notifyStatus[id];
+
   confirmModal(
-    "Notify This Week",
-    "Send start and end notifications for this entry?",
+    already ? "Resend Notification?" : "Notify This Week",
+    already
+      ? "Notifications were already sent. Resend them now?"
+      : "Send start and end notifications for this entry?",
     async () => {
       const res = await fetchAuth(`/api/admin/oncall/notify`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ mode: "both", entryId: id })
+        body: JSON.stringify({
+          mode: "both",
+          entryId: id,
+          retry: !!already
+        })
       });
-  if (!res.ok) throw new Error(await res.text());
 
-    APP_STATE.notifyStatus[id] = {
-    sentAt: new Date().toISOString(),
-    mode: "both"
-  };
+      if (!res.ok) throw new Error(await res.text());
 
-    renderScheduleAdmin(el);
-    toast("Notifications sent.");
+      APP_STATE.notifyStatus[id] = {
+        sentAt: new Date().toISOString(),
+        mode: "both",
+        retried: !!already
+      };
 
+      renderScheduleAdmin(el);
+      toast(already ? "Notifications resent." : "Notifications sent.");
     }
   );
   return;
-   }
+}
+
     };
   });
   el.querySelectorAll("input[data-time]").forEach(inp => {
@@ -2186,6 +2197,44 @@ function formatWeekLabel(startISO) {
   if (isNaN(d)) return "Week";
   return d.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
 }
+setInterval(async () => {
+  if (APP_STATE.publicMode) return;
+
+  const entries = APP_STATE.scheduleFull?.entries || [];
+  const now = Date.now();
+
+  for (const e of entries) {
+    if (APP_STATE.notifyStatus[e.id]) continue;
+
+    const t = getAutoNotifyTime(e);
+    if (!t) continue;
+
+    if (Math.abs(t.getTime() - now) < 60_000) {
+      try {
+        await fetchAuth(`/api/admin/oncall/notify`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            mode: "both",
+            entryId: e.id,
+            auto: true
+          })
+        });
+
+        APP_STATE.notifyStatus[e.id] = {
+          sentAt: new Date().toISOString(),
+          mode: "both",
+          auto: true
+        };
+
+        renderScheduleAdmin(byId("schedule"));
+      } catch (err) {
+        console.error("Auto-notify failed", err);
+      }
+    }
+  }
+}, 60_000);
+
 // =========================
 // BOOTSTRAP (MODULE SAFE)
 // =========================
