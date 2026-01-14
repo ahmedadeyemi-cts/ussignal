@@ -601,6 +601,19 @@ function wireTabs() {
 /* =========================
  * RBAC UI Guards
  * ========================= */
+if (APP_STATE.publicMode) {
+  [
+    "saveAllBtn",
+    "addScheduleBtn",
+    "revertBtn",
+    "notifyBtn",
+    "exportBtn",
+    "rosterTabBtn",
+    "autogenTabBtn",
+    "auditTabBtn"
+  ].forEach(id => setHidden(id, true));
+  return;
+}
 
 function applyRBACToUI() {
   const canEdit = roleAtLeast(APP_STATE.role, "editor");
@@ -897,15 +910,20 @@ function diffSchedules(original, draft) {
  * ========================= */
 
 async function loadSchedulePublic(el) {
-  const dept = String(APP_STATE.dept || "all").toLowerCase();
-  const res = await fetchPublic(`/api/oncall?department=${encodeURIComponent(dept)}`);
+  const res = await fetchPublic(`/api/oncall`);
   if (!res.ok) throw new Error(await res.text());
-  const data = await res.json();
-  APP_STATE.schedulePublic = data;
 
-  renderScheduleReadOnly(el, data.entries || []);
+  const data = await res.json();
+
+  // Normalize public payload
+  APP_STATE.schedulePublic = {
+    entries: data?.schedule?.entries || []
+  };
+
+  renderScheduleReadOnly(el, APP_STATE.schedulePublic.entries);
   refreshTimeline();
 }
+
 
 function renderScheduleReadOnly(el, entries) {
   el.innerHTML = "";
@@ -935,16 +953,19 @@ function renderCurrentOnCall() {
   if (!el) return;
 
   const source =
-    APP_STATE.draftSchedule ||
-    APP_STATE.scheduleFull ||
-    APP_STATE.schedulePublic;
+  APP_STATE.draftSchedule ||
+  APP_STATE.scheduleFull ||
+  APP_STATE.schedulePublic;
+
+const entries = source?.entries || [];
+
 
   if (!source || !source.entries?.length) {
     el.innerHTML = `<div class="subtle">No schedule loaded.</div>`;
     return;
   }
 
-  const entry = getCurrentOnCallEntry(source.entries);
+  const entry = getCurrentOnCallEntry(entries);
 
   if (!entry) {
     el.innerHTML = `<div class="subtle">No one is currently on call.</div>`;
