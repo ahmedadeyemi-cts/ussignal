@@ -2161,5 +2161,16 @@ function formatWeekLabel(startISO) {
   if (isNaN(d)) return "Week";
   return d.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
 }
+// =========================
+// BOOTSTRAP (MODULE SAFE)
+// =========================
+
+const ctx = window.__APP_CTX__ || {};
+
+document.addEventListener("DOMContentLoaded", () => {
+  initApp(ctx).catch(err => {
+    console.error("App init failed:", err);
+  });
+});
 
 
