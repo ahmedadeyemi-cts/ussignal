@@ -199,7 +199,6 @@ async function initApp(ctx = {}) {
   }
 
   // continue with UI wiring...
-}
 
    // =========================
   // Role Badge
@@ -234,6 +233,11 @@ if (!APP_STATE.publicMode) {
 }
 
 
+  // =========================
+// Admin-only button wiring
+// =========================
+if (!APP_STATE.publicMode) {
+
   onClick("exportBtn", exportExcel);
   onClick("icsBtn", exportICS);
 
@@ -252,7 +256,6 @@ if (!APP_STATE.publicMode) {
   onClick("saveAllBtn", saveAllChanges);
   onClick("addScheduleBtn", addScheduleEntryModal);
 
-
   onClick("rosterReloadBtn", loadRoster);
   onClick("rosterSaveBtn", () => confirmModal(
     "Save Roster",
@@ -267,14 +270,14 @@ if (!APP_STATE.publicMode) {
   ));
 
   onClick("auditRefreshBtn", loadAudit);
-  // =========================
-  // Bulk Upload / Download wiring
-  // =========================
+
+  // Bulk upload / download (admin-only)
   wireRosterBulkUpload();
   wireScheduleBulkUpload();
 
   onClick("rosterDownloadBtn", downloadRosterCSV);
   onClick("scheduleDownloadBtn", downloadScheduleCSV);
+}
 
     // =========================
   // FINALIZE UI FIRST (SAFE)
@@ -305,24 +308,7 @@ if (byId("roster")) {
     toast("Unable to load roster.", 5000);
   }
 }
-
-} // ✅ THIS CLOSES initApp
-
-// ✅ Keep this at top-level (not nested)
-//async function reloadSchedule() {
-//  const scheduleDiv =
-  //  byId("schedulePanel") ||
-  //  byId("scheduleTab") ||
-  //  byId("schedule");
-
-//  if (!scheduleDiv) return;
-
- // if (APP_STATE.admin || roleAtLeast(APP_STATE.role, "editor")) {
- //   await loadScheduleAdmin(scheduleDiv);
-//  } else {
- //   await loadSchedulePublic(scheduleDiv);
-//  }
-//}
+}
 async function reloadSchedule() {
   const el = byId("schedule");
   if (!el) return;
@@ -2062,7 +2048,7 @@ function refreshTimeline() {
 
   let entries = [];
 
-if (APP_STATE.draftSchedule?.entries) {
+if (APP_STATE.publicMode) {
   entries = APP_STATE.draftSchedule.entries.map(e => {
     // Freeze past entries to original schedule
     const original = APP_STATE.scheduleFull?.entries?.find(o => o.id === e.id);
