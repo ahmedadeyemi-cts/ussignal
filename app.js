@@ -169,6 +169,16 @@ async function fetchPublic(path, opts = {}) {
   const res = await fetch(apiUrl(path), { ...opts });
   return res;
 }
+function getAutoNotifyTime(entry) {
+  if (!entry?.startISO) return null;
+
+  const start = isoToDateLocalAssumed(entry.startISO);
+  if (isNaN(start)) return null;
+
+  // Notify 30 minutes before start
+  start.setMinutes(start.getMinutes() - 30);
+  return start;
+}
 
 /* =========================
  * Init
