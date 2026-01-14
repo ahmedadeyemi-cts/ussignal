@@ -2161,10 +2161,8 @@ function formatWeekLabel(startISO) {
 // BOOTSTRAP (MODULE SAFE)
 // =========================
 
-const ctx = window.__APP_CTX__ || {};
-
 document.addEventListener("DOMContentLoaded", () => {
-  initApp(ctx).catch(err => {
+  initApp(window.__APP_CTX__ || {}).catch(err => {
     console.error("App init failed:", err);
   });
 });
