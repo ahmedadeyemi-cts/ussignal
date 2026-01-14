@@ -1,3 +1,11 @@
+console.log("NOTIFY ENV CHECK", {
+  hasKey: !!env.BREVO_API_KEY,
+  senderEmail: env.BREVO_SENDER_EMAIL,
+  senderName: env.BREVO_SENDER_NAME,
+  admins: env.ADMIN_NOTIFICATION,
+  portal: env.PUBLIC_PORTAL_URL
+});
+
 export async function onRequest({ request, env }) {
   try {
     // -------------------------------
