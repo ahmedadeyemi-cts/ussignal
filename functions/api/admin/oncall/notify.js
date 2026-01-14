@@ -89,22 +89,49 @@ export async function onRequest({ request, env }) {
 
     for (const entry of targets) {
       const to = [];
-      const teamLines = [];
+const teamLines = [];
 
-      for (const [team, person] of Object.entries(entry.departments || {})) {
-        if (!person?.email) continue;
+// CASE 1: New multi-department structure
+if (entry.departments && typeof entry.departments === "object") {
+  for (const [team, person] of Object.entries(entry.departments)) {
+    if (!person?.email) continue;
 
-        to.push({
-          email: person.email,
-          name: person.name || team
-        });
+    to.push({
+      email: person.email,
+      name: person.name || team
+    });
 
-        teamLines.push(
-          `<li><strong>${team}</strong>: ${person.name || ""} (${person.email})</li>`
-        );
-      }
+    teamLines.push(
+      `<li><strong>${team}</strong>: ${person.name || ""} (${person.email})</li>`
+    );
+  }
+}
 
-      if (!to.length) continue;
+// CASE 2: Legacy / flat entry structure
+else if (entry.email) {
+  to.push({
+    email: entry.email,
+    name: entry.name || "On-Call"
+  });
+
+  teamLines.push(
+    `<li><strong>${entry.department || "On-Call"}</strong>: ${entry.name || ""} (${entry.email})</li>`
+  );
+}
+
+    if (!to.length) {
+  console.warn(
+    "Notify skipped — no recipients found",
+    {
+      entryId: entry.id,
+      department: entry.department,
+      startISO: entry.startISO,
+      endISO: entry.endISO
+    }
+  );
+  continue;
+}
+
 
       const subject =
         mode === "start"
@@ -186,9 +213,10 @@ async function sendBrevo(env, { to, cc, subject, html }) {
   });
 
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Brevo error: ${text}`);
-  }
+  const text = await res.text();
+  console.error("BREVO RESPONSE:", res.status, text);
+  throw new Error(`Brevo error (${res.status}): ${text}`);
+}
 }
 
 async function audit(env, record) {
