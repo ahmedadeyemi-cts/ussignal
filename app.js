@@ -2045,11 +2045,7 @@ function deptColor(dep) {
 function refreshTimeline() {
   const timeline = byId("timeline");
   if (!timeline) return;
-
-  let entries = [];
-
 let entries = [];
-
 if (APP_STATE.publicMode) {
   entries = APP_STATE.schedulePublic?.entries || [];
 } else if (APP_STATE.draftSchedule?.entries) {
