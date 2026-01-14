@@ -672,3 +672,16 @@ body {
   background: rgba(100, 116, 139, 0.15);
   color: #475569;
 }
+.notify-badge.auto {
+  background: #1e3a8a;
+  color: #fff;
+}
+
+.notify-badge.pending {
+  background: #f59e0b;
+}
+
+.notify-badge.notified {
+  background: #10b981;
+}
+
