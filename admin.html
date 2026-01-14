@@ -263,12 +263,14 @@
 
 <div id="toast" class="toast hidden"></div>
 
+<script>
+  window.__APP_CTX__ = {
+    admin: true,
+    role: "admin",
+    email: "{{CF-Access-Authenticated-User-Email}}"
+  };
+</script>
 <script type="module" src="app.js"></script>
-<!--<script>
-  window.addEventListener("DOMContentLoaded", () => {
-    initApp(window.__CTX__ || {});
-  });
-</script> -->
 
 </body>
 </html>
