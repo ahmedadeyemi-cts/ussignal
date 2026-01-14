@@ -7,7 +7,25 @@ export async function onRequest({ request, env }) {
     if (!jwt) {
       return json({ error: "Unauthorized" }, 401);
     }
+// -------------------------------
+// Brevo env validation
+// -------------------------------
+const missing = [];
 
+if (!env.BREVO_API_KEY) missing.push("BREVO_API_KEY");
+if (!env.BREVO_SENDER_EMAIL) missing.push("BREVO_SENDER_EMAIL");
+if (!env.BREVO_SENDER_NAME) missing.push("BREVO_SENDER_NAME");
+
+if (missing.length) {
+  console.error("Missing Brevo env vars:", missing);
+  return json(
+    {
+      error: "Email configuration incomplete",
+      missing
+    },
+    500
+  );
+}
     // -------------------------------
     // Parse request body
     // -------------------------------
@@ -206,7 +224,9 @@ async function sendBrevo(env, { to, cc, subject, html }) {
         name: env.BREVO_SENDER_NAME
       },
       to,
-      cc: cc.map(email => ({ email })),
+      cc: Array.isArray(cc) && cc.length
+  ? cc.map(email => ({ email }))
+  : undefined,
       subject,
       htmlContent: html
     })
