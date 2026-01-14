@@ -118,6 +118,9 @@ let APP_STATE = {
   email: "",
   allowedDepartments: [],
 
+   // 🔴 ADD THIS
+  publicMode: false,
+
   // ui state
   dept: "all",
   scheduleFull: null,
@@ -163,14 +166,32 @@ async function fetchPublic(path, opts = {}) {
  * ========================= */
 
 async function initApp(ctx = {}) {
-// =========================
-// AUTH FROM CLOUDFLARE ACCESS
-// =========================
-// Cloudflare Access already authenticated the user if admin.html loaded
-APP_STATE.isAuthenticated = !!ctx?.email;
-APP_STATE.admin = ctx?.role === "admin";
-APP_STATE.role = ctx?.role || "viewer";
-APP_STATE.email = ctx?.email || "";
+
+  // =========================
+  // PUBLIC MODE DETECTION (NEW)
+  // =========================
+  APP_STATE.publicMode = !!ctx?.public;
+
+  if (APP_STATE.publicMode) {
+    // 🔓 Public page (index.html)
+    APP_STATE.isAuthenticated = false;
+    APP_STATE.admin = false;
+    APP_STATE.role = "viewer";
+    APP_STATE.email = "";
+    APP_STATE.allowedDepartments = DEPT_KEYS.slice();
+  } else {
+    // =========================
+    // AUTH FROM CLOUDFLARE ACCESS (ADMIN)
+    // =========================
+    APP_STATE.isAuthenticated = !!ctx?.email;
+    APP_STATE.admin = ctx?.role === "admin";
+    APP_STATE.role = ctx?.role || "viewer";
+    APP_STATE.email = ctx?.email || "";
+
+    APP_STATE.allowedDepartments = Array.isArray(ctx?.departments)
+      ? ctx.departments
+      : DEPT_KEYS.slice();
+  }
 
 
 // Optional: email if Access injected it
@@ -206,8 +227,11 @@ APP_STATE.allowedDepartments = Array.isArray(ctx?.departments)
     };
   }
 
-  wireModal();
   wireTabs();
+if (!APP_STATE.publicMode) {
+  wireModal();
+}
+
 
   onClick("exportBtn", exportExcel);
   onClick("icsBtn", exportICS);
@@ -263,7 +287,12 @@ const scheduleEl = byId("schedule");
 if (!scheduleEl) {
   console.error("Schedule container (#schedule) not found");
 } else {
-  await loadScheduleAdmin(scheduleEl);
+  if (APP_STATE.publicMode) {
+    await loadSchedulePublic(scheduleEl);
+    startCurrentOnCallAutoRefresh();
+  } else {
+    await loadScheduleAdmin(scheduleEl);
+  }
 }
 
 if (byId("roster")) {
@@ -297,8 +326,13 @@ async function reloadSchedule() {
   const el = byId("schedule");
   if (!el) return;
 
+  if (APP_STATE.publicMode) {
+    await loadSchedulePublic(el);
+    return;
+  }
+
   if (APP_STATE.admin || roleAtLeast(APP_STATE.role, "editor")) {
-    await loadScheduleAdmin(el);  // ✅ fetch from KV, don’t just render
+    await loadScheduleAdmin(el);
   } else {
     await loadSchedulePublic(el);
   }
