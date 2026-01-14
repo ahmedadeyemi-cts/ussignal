@@ -94,6 +94,11 @@ function getHolidayName(date) {
  * Expect ctx from admin.html:
  *   { admin: true, role: "admin"|"editor"|"viewer", email: "...", departments: ["enterprise_network", ...] }
  */
+const isExplicitPublic = ctx?.publicMode === true || ctx?.public === true;
+const isExplicitAdmin  = ctx?.admin === true || ctx?.mode === "admin";
+
+APP_STATE.publicMode = isExplicitPublic || !isExplicitAdmin;
+
 const ROLE_ORDER = ["viewer", "editor", "admin"];
 function roleAtLeast(role, needed) {
   const a = ROLE_ORDER.indexOf(String(role || "viewer"));
@@ -170,7 +175,7 @@ async function initApp(ctx = {}) {
   // =========================
   // PUBLIC MODE DETECTION (NEW)
   // =========================
-  APP_STATE.publicMode = !!ctx?.public;
+  APP_STATE.publicMode = (ctx?.publicMode === true) || (ctx?.public === true);
 
   if (APP_STATE.publicMode) {
     // 🔓 Public page (index.html)
@@ -194,12 +199,12 @@ async function initApp(ctx = {}) {
   }
 
 
-// Optional: email if Access injected it
-APP_STATE.email = ctx?.email || "";
-
-APP_STATE.allowedDepartments = Array.isArray(ctx?.departments)
-  ? ctx.departments
-  : DEPT_KEYS.slice(); // fallback
+if (!APP_STATE.publicMode) {
+  APP_STATE.email = ctx?.email || "";
+  APP_STATE.allowedDepartments = Array.isArray(ctx?.departments)
+    ? ctx.departments
+    : DEPT_KEYS.slice();
+}
    // =========================
   // Role Badge
   // =========================
@@ -601,18 +606,33 @@ function wireTabs() {
 /* =========================
  * RBAC UI Guards
  * ========================= */
-if (APP_STATE.publicMode) {
-  [
-    "saveAllBtn",
-    "addScheduleBtn",
-    "revertBtn",
-    "notifyBtn",
-    "exportBtn",
-    "rosterTabBtn",
-    "autogenTabBtn",
-    "auditTabBtn"
-  ].forEach(id => setHidden(id, true));
-  return;
+function applyRBACToUI() {
+  if (APP_STATE.publicMode) {
+    [
+      "saveAllBtn",
+      "addScheduleBtn",
+      "revertBtn",
+      "notifyBtn",
+      "exportBtn",
+      "rosterTabBtn",
+      "autogenTabBtn",
+      "auditTabBtn"
+    ].forEach(id => setHidden(id, true));
+    return;
+  }
+
+  const canEdit = roleAtLeast(APP_STATE.role, "editor");
+  const isAdmin = roleAtLeast(APP_STATE.role, "admin");
+
+  setHidden("saveAllBtn", !canEdit);
+  setHidden("addScheduleBtn", !canEdit);
+  setHidden("revertBtn", !isAdmin);
+  setHidden("notifyBtn", !isAdmin);
+  setHidden("exportBtn", !isAdmin);
+
+  setHidden("rosterTabBtn", !isAdmin);
+  setHidden("autogenTabBtn", !isAdmin);
+  setHidden("auditTabBtn", !isAdmin);
 }
 
 function applyRBACToUI() {
