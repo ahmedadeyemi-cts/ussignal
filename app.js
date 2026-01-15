@@ -205,17 +205,31 @@ async function openNotifyTimeline(entryId) {
   );
 
   const body =
-    events.length
-      ? `<ul class="timeline-list">
-          ${events.map(e => `
+  events.length
+    ? `<ul class="timeline-list">
+        ${events.map(e => {
+          const phones = (e.phones || []).join(", ");
+          const emails = (e.emails || []).join(", ");
+
+          return `
             <li>
               <b>${escapeHtml(e.action)}</b><br/>
               ${new Date(e.ts).toLocaleString("en-US")} ·
-              ${escapeHtml(e.actor || "system")}
+              ${escapeHtml(e.actor || "system")}<br/>
+
+              ${emails
+                ? `<div class="small">📧 ${escapeHtml(emails)}</div>`
+                : ""}
+
+              ${phones
+                ? `<div class="small">📱 ${escapeHtml(phones)}</div>`
+                : ""}
             </li>
-          `).join("")}
-        </ul>`
-      : `<div class="subtle">No notifications sent for this entry.</div>`;
+          `;
+        }).join("")}
+      </ul>`
+    : `<div class="subtle">No notifications sent for this entry.</div>`;
+
 
   showModal(
     "Notification Timeline",
@@ -1374,12 +1388,23 @@ ${
             <div class="small">Entry ID: ${escapeHtml(String(e.id))}</div>
           </div>
 
-          <div class="card-actions">
-           ${isAdmin && !isPastOnCall(e)
-  ? `<button class="ghost" data-action="notifyEntry" data-id="${escapeHtml(String(e.id))}">
-       Notify
-     </button>`
-  : ""}
+         <div class="card-actions">
+  ${isAdmin && !isPastOnCall(e)
+    ? `
+      <button class="ghost"
+        data-action="notifyEntry"
+        data-id="${escapeHtml(String(e.id))}">
+        Notify (Email + SMS)
+      </button>
+
+      <button class="ghost"
+        data-action="notifySMS"
+        data-id="${escapeHtml(String(e.id))}">
+        Send SMS Only
+      </button>
+    `
+    : ""}
+
 
           ${canEdit && !isPast
   ? `<button class="primary" data-action="${editing ? "done" : "edit"}" data-id="${escapeHtml(String(e.id))}">
@@ -1458,6 +1483,38 @@ if (action === "notifyEntry") {
 
       renderScheduleAdmin(el);
       toast(already ? "Notifications resent." : "Notifications sent.");
+    }
+  );
+  return;
+}
+if (action === "notifySMS") {
+  const entry = APP_STATE.scheduleFull?.entries?.find(e => String(e.id) === String(id));
+  if (!entry || isPastOnCall(entry)) {
+    toast("Cannot send SMS for past on-call weeks.");
+    return;
+  }
+
+  confirmModal(
+    "Send SMS Notification",
+    "Send SMS notification to the on-call user(s) for this week?",
+    async () => {
+      const res = await fetchAuth(`/api/admin/oncall/notify`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          mode: "sms",
+          entryId: id
+        })
+      });
+
+      if (!res.ok) throw new Error(await res.text());
+
+      // Persist UI state
+      APP_STATE.notifyStatus[id] ||= {};
+      APP_STATE.notifyStatus[id].sms = { sentAt: new Date().toISOString() };
+
+      renderScheduleAdmin(el);
+      toast("SMS notification sent.");
     }
   );
   return;
