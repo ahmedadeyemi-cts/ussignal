@@ -18,7 +18,15 @@ export async function onRequest({ request, env }) {
       return json({ error: "Invalid schedule payload" }, 400);
     }
 
-    const now = new Date();
+    // -------------------------------
+// Determine target entries (timezone-aware)
+// -------------------------------
+const now = new Date(
+  new Date().toLocaleString("en-US", {
+    timeZone: schedule.tz || "UTC"
+  })
+);
+
 
     // -------------------------------
     // Archive past entries (immutable)
