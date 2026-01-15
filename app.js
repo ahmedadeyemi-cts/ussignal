@@ -1211,9 +1211,10 @@ async function loadScheduleAdmin(el) {
 (data.entries || []).forEach(e => {
   if (e.notifiedAt) {
     APP_STATE.notifyStatus[e.id] = {
-      sentAt: e.notifiedAt,
-      mode: e.notifyMode || "both"
-    };
+  sentAt: e.notifiedAt,
+  mode: e.notifyMode || "both",
+  by: e.notifiedBy || "admin"
+};
   }
 });
 
@@ -1301,9 +1302,12 @@ function renderScheduleAdmin(el) {
   }
 </div>
 ${
+  ${
   APP_STATE.notifyStatus[e.id]
-    ? `<span class="notify-badge notified">🔔 Notified</span>`
-    : `<span class="notify-badge pending">⏳ Not Notified</span>`
+    ? `<span class="notify-badge notified">
+         🔔 Notified (${APP_STATE.notifyStatus[e.id].by})
+       </span>`
+    : `<span class="notify-badge pending">⏳ Pending</span>`
 }
 
 
