@@ -84,11 +84,12 @@ if (!entries.length) {
 // -------------------------------
 // Determine target entries (timezone-aware)
 // -------------------------------
+const tz = current.tz || "America/Chicago";
+
 const now = new Date(
-  new Date().toLocaleString("en-US", {
-    timeZone: schedule.tz || "UTC"
-  })
+  new Date().toLocaleString("en-US", { timeZone: tz })
 );
+
     let targets = [];
 
     if (entryId) {
