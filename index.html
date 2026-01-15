@@ -19,24 +19,16 @@
   gap: 8px;
   padding: 9px 16px;
   border-radius: 999px;
-  background: linear-gradient(
-    135deg,
-    #0b2d5b,
-    #123a6f
-  );
+  background: linear-gradient(135deg,#0b2d5b,#123a6f);
   color: #ffffff;
   font-weight: 600;
   font-size: 13px;
   letter-spacing: 0.2px;
   text-decoration: none;
-  box-shadow:
-    0 1px 2px rgba(0,0,0,.12),
-    inset 0 0 0 1px rgba(255,255,255,.08);
+  box-shadow: 0 1px 2px rgba(0,0,0,.12), inset 0 0 0 1px rgba(255,255,255,.08);
   white-space: nowrap;
 }
-.pay-request-btn:hover {
-  background: linear-gradient(135deg,#09254b,#0b2d5b);
-}
+.pay-request-btn:hover { background: linear-gradient(135deg,#09254b,#0b2d5b); }
 .pay-request-btn:active { transform: translateY(1px); }
 .pay-request-btn:focus-visible {
   outline: 3px solid rgba(11, 45, 91, 0.45);
@@ -76,16 +68,33 @@
   transform: translateY(0);
 }
 
+/* ===== TIMELINE ROW ANIMATION ===== */
+#timeline > * {
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 260ms ease, transform 260ms ease;
+}
+#timeline > *.animate-in {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ===== TODAY PULSE ===== */
+@keyframes todayPulse {
+  0% { box-shadow: 0 0 0 0 rgba(14,165,233,.45); }
+  70% { box-shadow: 0 0 0 10px rgba(14,165,233,0); }
+  100% { box-shadow: 0 0 0 0 rgba(14,165,233,0); }
+}
+.today-indicator {
+  position: relative;
+  border-radius: 12px;
+  animation: todayPulse 2.4s infinite;
+}
+
 /* ===== MOBILE OPTIMIZATION ===== */
 @media (max-width: 768px) {
-  .controls {
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-  .pay-request-btn {
-    width: 100%;
-    justify-content: center;
-  }
+  .controls { flex-wrap: wrap; gap: 8px; }
+  .pay-request-btn { width: 100%; justify-content: center; }
 }
 
 /* ===== LIVE CARD ===== */
@@ -147,21 +156,15 @@
       <option value="system_storage">System & Storage</option>
     </select>
 
-    <a
-      href="https://forms.microsoft.com/Pages/ResponsePage.aspx?id=2kFZU3Lai0qDeJg6VL7DQmcodVUCw2tHgn0S1PzMbxpUQ0NXTlQ5TEtERzE0RzNHN0tNMjJNWThWRS4u"
-      target="_blank"
-      rel="noopener"
-      class="pay-request-btn"
-      aria-label="Submit US Signal On-Call Pay Request"
-    >
+    <a href="https://forms.microsoft.com/Pages/ResponsePage.aspx?id=2kFZU3Lai0qDeJg6VL7DQmcodVUCw2tHgn0S1PzMbxpUQ0NXTlQ5TEtERzE0RzNHN0tNMjJNWThWRS4u"
+       target="_blank" rel="noopener"
+       class="pay-request-btn"
+       aria-label="Submit US Signal On-Call Pay Request">
       💼 On-Call Pay Request
     </a>
   </div>
 </header>
 
-<!-- =========================
-     PUBLIC TABS
-========================= -->
 <nav class="tabs" role="tablist">
   <button class="tab active" data-tab="timelineTab" role="tab">Timeline</button>
   <button class="tab" data-tab="currentTab" role="tab">Who’s On Call Now</button>
@@ -197,34 +200,74 @@
 </script>
 <script type="module" src="app.js"></script>
 
-<!-- ===== TAB HASH + STICKY HOMEPAGE LOGIC ===== -->
+<!-- ===== ADVANCED INTERACTION LAYER ===== -->
 <script>
 (function () {
-  const tabs = document.querySelectorAll(".tabs .tab");
-  const panels = document.querySelectorAll(".panel");
+  const tabs = Array.from(document.querySelectorAll(".tabs .tab"));
+  const panels = Array.from(document.querySelectorAll(".panel"));
 
   function activate(tabName, updateHash = true) {
-    tabs.forEach(t => {
-      t.classList.toggle("active", t.dataset.tab === tabName);
-    });
-    panels.forEach(p => {
-      p.classList.toggle("active", p.id === tabName);
-    });
-    if (updateHash) {
-      history.replaceState(null, "", "#" + tabName.replace("Tab", ""));
-    }
+    tabs.forEach(t => t.classList.toggle("active", t.dataset.tab === tabName));
+    panels.forEach(p => p.classList.toggle("active", p.id === tabName));
+    if (updateHash) history.replaceState(null, "", "#" + tabName.replace("Tab",""));
   }
 
-  tabs.forEach(btn => {
-    btn.addEventListener("click", () => {
-      activate(btn.dataset.tab);
-    });
+  tabs.forEach(btn => btn.addEventListener("click", () => activate(btn.dataset.tab)));
+
+  /* ===== KEYBOARD NAV ===== */
+  document.addEventListener("keydown", e => {
+    const active = tabs.findIndex(t => t.classList.contains("active"));
+    if (e.key === "ArrowRight" && tabs[active+1]) activate(tabs[active+1].dataset.tab);
+    if (e.key === "ArrowLeft" && tabs[active-1]) activate(tabs[active-1].dataset.tab);
+    if (e.key === "Home") activate("timelineTab");
+    if (e.key === "End") activate("scheduleTab");
   });
 
-  const hash = location.hash.replace("#", "");
-  if (hash === "current") activate("currentTab", false);
-  else if (hash === "schedule") activate("scheduleTab", false);
-  else activate("timelineTab", false); // DEFAULT / STICKY HOMEPAGE
+  /* ===== VELOCITY SWIPE (TABS) ===== */
+  let sx=0, st=0;
+  document.addEventListener("touchstart", e => {
+    sx = e.touches[0].clientX;
+    st = Date.now();
+  }, { passive:true });
+
+  document.addEventListener("touchend", e => {
+    const dx = e.changedTouches[0].clientX - sx;
+    const dt = Date.now() - st;
+    const velocity = Math.abs(dx / dt);
+    if (Math.abs(dx) > 60 && velocity > 0.35) {
+      const i = tabs.findIndex(t => t.classList.contains("active"));
+      const next = dx < 0 ? i+1 : i-1;
+      if (tabs[next]) activate(tabs[next].dataset.tab);
+    }
+  });
+
+  /* ===== TIMELINE OBSERVER + WEEK SWIPE ===== */
+  const timeline = document.getElementById("timeline");
+  if (!timeline) return;
+
+  const obs = new MutationObserver(() => {
+    Array.from(timeline.children).forEach((r,i)=>{
+      setTimeout(()=>r.classList.add("animate-in"),i*35);
+    });
+    const today =
+      timeline.querySelector(".current-week") ||
+      timeline.querySelector("[data-current-week='true']");
+    if (today) {
+      today.classList.add("today-indicator");
+      today.scrollIntoView({ behavior:"smooth", block:"center" });
+    }
+  });
+  obs.observe(timeline,{childList:true});
+
+  let tsx=0;
+  timeline.addEventListener("touchstart",e=>tsx=e.touches[0].clientX,{passive:true});
+  timeline.addEventListener("touchend",e=>{
+    const dx=e.changedTouches[0].clientX-tsx;
+    if(Math.abs(dx)>80){
+      timeline.dispatchEvent(new CustomEvent(dx<0?"timeline:next":"timeline:prev"));
+    }
+  });
+
 })();
 </script>
 
