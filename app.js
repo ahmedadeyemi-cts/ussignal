@@ -333,7 +333,7 @@ if (byId("roster")) {
     toast("Unable to load roster.", 5000);
   }
 }
-
+} // ✅ END initApp
 async function reloadSchedule() {
   const el = byId("schedule");
   if (!el) return;
@@ -349,7 +349,6 @@ async function reloadSchedule() {
     await loadSchedulePublic(el);
   }
 }
-} // ✅ END initApp
 
 /* =========================
  * Disable Save button until dirty
