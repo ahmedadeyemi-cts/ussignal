@@ -21,11 +21,7 @@ export async function onRequest({ request, env }) {
     // -------------------------------
 // Determine target entries (timezone-aware)
 // -------------------------------
-const now = new Date(
-  new Date().toLocaleString("en-US", {
-    timeZone: schedule.tz || "UTC"
-  })
-);
+const now = new Date();
 
 
     // -------------------------------
