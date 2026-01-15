@@ -59,6 +59,39 @@ export async function onRequest({ request, env }) {
       "ONCALL:SCHEDULE",
       JSON.stringify(finalizedSchedule)
     );
+    // -------------------------------
+// Snapshot FULL schedule (versioned history)
+// -------------------------------
+const snapshotId = new Date().toISOString();
+const snapshotKey = `ONCALL:HISTORY:${snapshotId}`;
+
+const snapshot = {
+  id: snapshotId,
+  savedAt: snapshotId,
+  savedBy: "admin",
+  schedule: finalizedSchedule
+};
+
+// Save snapshot
+await env.ONCALL_KV.put(snapshotKey, JSON.stringify(snapshot));
+
+// Update history index
+const indexRaw = await env.ONCALL_KV.get("ONCALL:HISTORY:INDEX");
+const index = indexRaw ? JSON.parse(indexRaw) : [];
+
+index.unshift({
+  id: snapshotId,
+  savedAt: snapshotId,
+  savedBy: "admin",
+  entriesCount: finalizedSchedule.entries.length
+});
+
+// Keep last 50 versions
+await env.ONCALL_KV.put(
+  "ONCALL:HISTORY:INDEX",
+  JSON.stringify(index.slice(0, 50))
+);
+
 
     // -------------------------------
     // Derive CURRENT on-call entry
