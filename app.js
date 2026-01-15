@@ -1302,7 +1302,6 @@ function renderScheduleAdmin(el) {
   }
 </div>
 ${
-  ${
   APP_STATE.notifyStatus[e.id]
     ? `<span class="notify-badge notified">
          🔔 Notified (${APP_STATE.notifyStatus[e.id].by})
