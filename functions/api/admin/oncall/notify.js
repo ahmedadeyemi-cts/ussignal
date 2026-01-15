@@ -76,11 +76,14 @@ if (missing.length) {
       return json({ error: "No entries available" }, 400);
     }
 
-    // -------------------------------
-    // Determine target entries
-    // -------------------------------
-    const now = new Date();
-
+// -------------------------------
+// Determine target entries (timezone-aware)
+// -------------------------------
+const now = new Date(
+  new Date().toLocaleString("en-US", {
+    timeZone: schedule.tz || "UTC"
+  })
+);
     let targets = [];
 
     if (entryId) {
@@ -385,7 +388,7 @@ async function sendSMS(env, { to, message }) {
     return;
   }
 
-  await fetch("https://api.brevo.com/v3/transactionalSMS/send ", {
+  await fetch("https://api.brevo.com/v3/transactionalSMS/send", {
     method: "POST",
     headers: {
       "content-type": "application/json",
