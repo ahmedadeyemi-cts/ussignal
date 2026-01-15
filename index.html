@@ -34,104 +34,91 @@
     inset 0 0 0 1px rgba(255,255,255,.08);
   white-space: nowrap;
 }
-
 .pay-request-btn:hover {
-  background: linear-gradient(
-    135deg,
-    #09254b,
-    #0b2d5b
-  );
+  background: linear-gradient(135deg,#09254b,#0b2d5b);
 }
-
-.pay-request-btn:active {
-  transform: translateY(1px);
-}
-
+.pay-request-btn:active { transform: translateY(1px); }
 .pay-request-btn:focus-visible {
   outline: 3px solid rgba(11, 45, 91, 0.45);
   outline-offset: 2px;
 }
 
+/* ===== PUBLIC TABS ===== */
+.tabs {
+  display: flex;
+  gap: 6px;
+  padding: 10px;
+  background: var(--card);
+  border-radius: 12px;
+  margin-bottom: 16px;
+  overflow-x: auto;
+}
+.tabs button {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-weight: 600;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
 
-    /* ===== PUBLIC TABS ===== */
-    .tabs {
-      display: flex;
-      gap: 6px;
-      padding: 10px;
-      background: var(--card);
-      border-radius: 12px;
-      margin-bottom: 16px;
-      overflow-x: auto;
-    }
-    .tabs button {
-      flex: 1;
-      padding: 10px 14px;
-      border-radius: 10px;
-      font-weight: 600;
-      background: transparent;
-      border: none;
-      cursor: pointer;
-    }
-    .tabs button.active {
-      background: var(--accent);
-      color: #fff;
-    }
+/* ===== PANEL ANIMATION ===== */
+.panel {
+  display: none;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+.panel.active {
+  display: block;
+  opacity: 1;
+  transform: translateY(0);
+}
 
-    /* ===== MOBILE OPTIMIZATION ===== */
-    @media (max-width: 768px) {
-      .controls {
-        flex-wrap: wrap;
-        gap: 8px;
-      }
-      .pay-request-btn {
-        width: 100%;
-        justify-content: center;
-      }
-    }
+/* ===== MOBILE OPTIMIZATION ===== */
+@media (max-width: 768px) {
+  .controls {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .pay-request-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
 
-    /* ===== LIVE CARD ===== */
-    .live-card {
-      border-left: 6px solid #0ea5e9;
-      background: linear-gradient(90deg, rgba(14,165,233,.08), transparent);
-      padding: 14px;
-      border-radius: 12px;
-      margin-bottom: 16px;
-    }
+/* ===== LIVE CARD ===== */
+.live-card {
+  border-left: 6px solid #0ea5e9;
+  background: linear-gradient(90deg, rgba(14,165,233,.08), transparent);
+  padding: 14px;
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+.subtle { color: var(--muted); font-size: 13px; }
 
-    .subtle {
-      color: var(--muted);
-      font-size: 13px;
-    }
-    /* ===== US SIGNAL TAB STYLING FIX ===== */
-
+/* ===== US SIGNAL TAB STYLING FIX ===== */
 :root {
   --us-navy: #0b2d5b;
   --us-navy-soft: #e6eef8;
 }
-
-/* Base tab */
 .tabs button.tab {
-  color: #374151; /* slate-700 */
+  color: #374151;
   background: transparent;
   border-radius: 10px;
   font-weight: 600;
   transition: background 120ms ease, color 120ms ease;
 }
-
-/* Hover (inactive only) */
 .tabs button.tab:not(.active):hover {
   background: rgba(11, 45, 91, 0.08);
   color: var(--us-navy);
 }
-
-/* ACTIVE TAB */
 .tabs button.tab.active {
   background: var(--us-navy-soft);
-  color: var(--us-navy);          /* 🔑 FIX: visible navy text */
+  color: var(--us-navy);
   box-shadow: inset 0 -3px 0 var(--us-navy);
 }
-
-/* Keyboard accessibility */
 .tabs button.tab:focus-visible {
   outline: 3px solid rgba(11, 45, 91, 0.4);
   outline-offset: 2px;
@@ -151,18 +138,9 @@
   </div>
 
   <div class="controls">
-    <button
-      id="themeToggle"
-      class="ghost"
-      aria-label="Toggle light or dark mode"
-    >
-      🌙
-    </button>
+    <button id="themeToggle" class="ghost" aria-label="Toggle light or dark mode">🌙</button>
 
-    <select
-      id="deptFilter"
-      aria-label="Filter by department"
-    >
+    <select id="deptFilter" aria-label="Filter by department">
       <option value="all">All Departments</option>
       <option value="enterprise_network">Enterprise Network</option>
       <option value="collaboration">Collaboration</option>
@@ -185,97 +163,70 @@
      PUBLIC TABS
 ========================= -->
 <nav class="tabs" role="tablist">
-  <button
-    class="tab active"
-    data-tab="currentTab"
-    role="tab"
-    aria-selected="true"
-  >
-    Who’s On Call Now
-  </button>
-
-  <button
-    class="tab"
-    data-tab="scheduleTab"
-    role="tab"
-    aria-selected="false"
-  >
-    Schedule
-  </button>
-
-  <button
-    class="tab"
-    data-tab="timelineTab"
-    role="tab"
-    aria-selected="false"
-  >
-    Timeline
-  </button>
+  <button class="tab active" data-tab="timelineTab" role="tab">Timeline</button>
+  <button class="tab" data-tab="currentTab" role="tab">Who’s On Call Now</button>
+  <button class="tab" data-tab="scheduleTab" role="tab">Full Schedule</button>
 </nav>
+
 <main class="container">
 
-  <!-- WHO'S ON CALL NOW -->
-  <section
-    id="currentTab"
-    class="panel active"
-    role="tabpanel"
-  >
-    <div class="panel-head">
-      <h2>Who’s On Call Now</h2>
-      <div class="subtle">Live · Read-only · Auto-updated</div>
-    </div>
-
-    <div
-      id="currentOnCall"
-      class="live-card"
-      aria-live="polite"
-      aria-atomic="true"
-    ></div>
-  </section>
-
-  <!-- SCHEDULE -->
-  <section
-    id="scheduleTab"
-    class="panel"
-    role="tabpanel"
-  >
-    <h2>On-Call Schedule</h2>
-    <div id="schedule"></div>
-  </section>
-
-  <!-- TIMELINE -->
-  <section
-    id="timelineTab"
-    class="panel"
-    role="tabpanel"
-  >
+  <section id="timelineTab" class="panel active" role="tabpanel">
     <h2>Weekly Timeline</h2>
     <div id="timeline"></div>
   </section>
 
+  <section id="currentTab" class="panel" role="tabpanel">
+    <div class="panel-head">
+      <h2>Who’s On Call Now</h2>
+      <div class="subtle">Live · Read-only · Auto-updated</div>
+    </div>
+    <div id="currentOnCall" class="live-card"></div>
+  </section>
+
+  <section id="scheduleTab" class="panel" role="tabpanel">
+    <h2>Full Schedule</h2>
+    <div id="schedule"></div>
+  </section>
+
 </main>
 
-<div
-  id="toast"
-  class="toast hidden"
-  role="status"
-  aria-live="polite"
-></div>
+<div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
 <script>
   window.__APP_CTX__ = { public: true };
 </script>
 <script type="module" src="app.js"></script>
 
-<!--<script>
-  // PUBLIC MODE — no admin, no auth, no notify, no edits
-  window.addEventListener("DOMContentLoaded", () => {
-    initApp({
-      admin: false,
-      public: true
+<!-- ===== TAB HASH + STICKY HOMEPAGE LOGIC ===== -->
+<script>
+(function () {
+  const tabs = document.querySelectorAll(".tabs .tab");
+  const panels = document.querySelectorAll(".panel");
+
+  function activate(tabName, updateHash = true) {
+    tabs.forEach(t => {
+      t.classList.toggle("active", t.dataset.tab === tabName);
+    });
+    panels.forEach(p => {
+      p.classList.toggle("active", p.id === tabName);
+    });
+    if (updateHash) {
+      history.replaceState(null, "", "#" + tabName.replace("Tab", ""));
+    }
+  }
+
+  tabs.forEach(btn => {
+    btn.addEventListener("click", () => {
+      activate(btn.dataset.tab);
     });
   });
-</script> -->
+
+  const hash = location.hash.replace("#", "");
+  if (hash === "current") activate("currentTab", false);
+  else if (hash === "schedule") activate("scheduleTab", false);
+  else activate("timelineTab", false); // DEFAULT / STICKY HOMEPAGE
+})();
+</script>
 
 </body>
 </html>
