@@ -693,3 +693,25 @@ body {
 
 .notify-badge.email { background:#e0f2fe; }
 .notify-badge.sms { background:#ecfeff; }
+.notify-badges {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.notify-badge.email {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.notify-badge.sms {
+  background: #ecfeff;
+  color: #0f766e;
+}
+
+.timeline-list li {
+  padding: 10px 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
