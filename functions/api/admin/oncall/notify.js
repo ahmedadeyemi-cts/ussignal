@@ -1,11 +1,3 @@
-console.log("NOTIFY ENV CHECK", {
-  hasKey: !!env.BREVO_API_KEY,
-  senderEmail: env.BREVO_SENDER_EMAIL,
-  senderName: env.BREVO_SENDER_NAME,
-  admins: env.ADMIN_NOTIFICATION,
-  portal: env.PUBLIC_PORTAL_URL
-});
-
 export async function onRequest({ request, env }) {
   try {
     // -------------------------------
@@ -15,6 +7,14 @@ export async function onRequest({ request, env }) {
     if (!jwt) {
       return json({ error: "Unauthorized" }, 401);
     }
+    console.log("NOTIFY ENV CHECK", {
+  hasKey: !!env.BREVO_API_KEY,
+  senderEmail: env.BREVO_SENDER_EMAIL,
+  senderName: env.BREVO_SENDER_NAME,
+  admins: env.ADMIN_NOTIFICATION,
+  portal: env.PUBLIC_PORTAL_URL
+});
+
 // -------------------------------
 // Brevo env validation
 // -------------------------------
@@ -114,6 +114,20 @@ if (missing.length) {
     let emailsSent = 0;
 
     for (const entry of targets) {
+            // -------------------------------
+      // Prevent duplicate notifications
+      // -------------------------------
+      if (entry.notifiedAt) {
+        console.warn(
+          "Notify skipped — already notified",
+          {
+            entryId: entry.id,
+            notifiedAt: entry.notifiedAt
+          }
+        );
+        continue;
+      }
+
       const to = [];
 const teamLines = [];
 
@@ -212,7 +226,8 @@ else if (entry.email) {
       action: entryId ? "MANUAL_NOTIFY_ENTRY" : "MANUAL_NOTIFY_ACTIVE",
       mode,
       entryId,
-      emailsSent
+      emailsSent,
+      actor: payload.auto ? "system" : "admin"
     });
 
     return json({ ok: true, emailsSent });
@@ -262,7 +277,7 @@ async function audit(env, record) {
 
   audit.unshift({
     ts: new Date().toISOString(),
-    actor: "admin",
+    actor: record.actor || "admin",
     ...record
   });
 
