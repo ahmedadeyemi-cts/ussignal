@@ -164,6 +164,18 @@ async function fetchAuth(path, opts = {}) {
   return res;
 }
 
+async function loadCurrentOnCall() {
+  try {
+    const res = await fetchPublic("/api/oncall/current");
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    return data && data.startISO ? data : null;
+  } catch {
+    return null;
+  }
+}
+
 // Use for public endpoints (no auth required)
 async function fetchPublic(path, opts = {}) {
   const res = await fetch(apiUrl(path), { ...opts });
@@ -969,7 +981,23 @@ const entries = source?.entries || [];
     return;
   }
 
-  const entry = getCurrentOnCallEntry(entries);
+  const entry = getCurrentOnCallEntry(entries);async function renderCurrentOnCall() {
+  const el = byId("currentOnCall");
+  if (!el) return;
+
+  // 1️⃣ Authoritative source
+  let entry = await loadCurrentOnCall();
+
+  // 2️⃣ Fallback (legacy / safety)
+  if (!entry) {
+    const source =
+      (APP_STATE.draftSchedule?.entries?.length && APP_STATE.draftSchedule) ||
+      (APP_STATE.scheduleFull?.entries?.length && APP_STATE.scheduleFull) ||
+      APP_STATE.schedulePublic;
+
+    const entries = source?.entries || [];
+    entry = getCurrentOnCallEntry(entries);
+  }
 
   if (!entry) {
     el.innerHTML = `<div class="subtle">No one is currently on call.</div>`;
@@ -990,7 +1018,7 @@ const entries = source?.entries || [];
       <div class="entry-grid">
         ${renderDeptBlocks(
           entry.departments,
-          roleAtLeast(APP_STATE.role, "editor"), // inline-edit allowed
+          roleAtLeast(APP_STATE.role, "editor"),
           entry.id,
           false
         )}
