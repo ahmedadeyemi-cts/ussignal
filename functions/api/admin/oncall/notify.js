@@ -448,7 +448,7 @@ async function sendBrevo(env, { to, cc, subject, html }) {
     // SMS Sending
     // -------------------------------
 async function sendSMS(env, { to, message }) {
-  if (!env.BREVO_API_KEY) {
+  if (!env.SMS_PROVIDER_API_KEY) {
   console.warn("SMS skipped — no Brevo API key");
   return;
 }
@@ -457,7 +457,7 @@ async function sendSMS(env, { to, message }) {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "authorization": `Bearer ${env.BREVO_API_KEY}`
+      "authorization": `Bearer ${env.SMS_PROVIDER_API_KEY}`
     },
     body: JSON.stringify({
       from: env.SMS_SENDER_ID || "USSignal OnCall",
