@@ -954,9 +954,12 @@ function renderCurrentOnCall() {
   if (!el) return;
 
   const source =
-  APP_STATE.draftSchedule ||
-  APP_STATE.scheduleFull ||
-  APP_STATE.schedulePublic;
+  (APP_STATE.draftSchedule && APP_STATE.draftSchedule.entries?.length)
+    ? APP_STATE.draftSchedule
+    : (APP_STATE.scheduleFull && APP_STATE.scheduleFull.entries?.length)
+      ? APP_STATE.scheduleFull
+      : APP_STATE.schedulePublic;
+
 
 const entries = source?.entries || [];
 
