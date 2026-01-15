@@ -958,30 +958,7 @@ function renderScheduleReadOnly(el, entries) {
   });
 }
 
-/* =========================
- * Renderer for “Who’s On Call Now”
- * ========================= */
-function renderCurrentOnCall() {
-  const el = byId("currentOnCall");
-  if (!el) return;
-
-  const source =
-  (APP_STATE.draftSchedule && APP_STATE.draftSchedule.entries?.length)
-    ? APP_STATE.draftSchedule
-    : (APP_STATE.scheduleFull && APP_STATE.scheduleFull.entries?.length)
-      ? APP_STATE.scheduleFull
-      : APP_STATE.schedulePublic;
-
-
-const entries = source?.entries || [];
-
-
-  if (!source || !source.entries?.length) {
-    el.innerHTML = `<div class="subtle">No schedule loaded.</div>`;
-    return;
-  }
-
-  const entry = getCurrentOnCallEntry(entries);async function renderCurrentOnCall() {
+async function renderCurrentOnCall() {
   const el = byId("currentOnCall");
   if (!el) return;
 
