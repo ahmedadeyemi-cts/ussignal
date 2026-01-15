@@ -92,13 +92,18 @@ const now = new Date(
         return json({ error: "Entry not found" }, 404);
       }
       targets = [found];
-    } else {
-      targets = entries.filter(e => {
-        const start = new Date(e.startISO);
-        const end = new Date(e.endISO);
-        return now >= start && now <= end;
-      });
-    }
+   } else {
+  targets = entries.filter(e => {
+    const start = new Date(e.startISO);
+    const end = new Date(e.endISO);
+
+    // Active OR upcoming (admin-triggered)
+    return (
+      now >= start && now <= end ||   // active
+      start > now                     // upcoming
+    );
+  });
+}
 
     if (!targets.length) {
       return json({ error: "No active on-call entries" }, 400);
