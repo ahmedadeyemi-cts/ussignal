@@ -194,7 +194,16 @@ else if (entry.email) {
       });
 
       emailsSent++;
+      entry.notifiedAt = new Date().toISOString();
+      entry.notifyMode = mode;
+      entry.notifiedBy = payload.auto ? "system" : "admin";
+
     }
+    await env.ONCALL_KV.put(
+  "ONCALL:CURRENT",
+  JSON.stringify(schedule)
+);
+
 
     // -------------------------------
     // Audit
