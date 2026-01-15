@@ -326,13 +326,23 @@ entry.notification.email = {
   subject
 };
 
+entry.smsStatus ||= [];
+
 if (notifyType === "START_TODAY") {
   for (const [_, person] of Object.entries(entry.departments || {})) {
     if (!person?.phone) continue;
 
-    await sendSMS(env, {
+    const sms = await sendSMS(env, {
       to: person.phone,
       message: `US Signal On-Call: Your on-call duty starts now and ends ${endLabel}.`
+    });
+
+    entry.smsStatus.push({
+      phone: person.phone,
+      ok: sms.ok,
+      messageId: sms.messageId || null,
+      error: sms.error || null,
+      sentAt: new Date().toISOString()
     });
   }
 }
@@ -388,7 +398,8 @@ if (scheduleRaw) {
       mode,
       entryId,
       emailsSent,
-      actor: payload.auto ? "system" : "admin"
+      actor: payload.auto ? "system" : "admin",
+      sms: entry.smsStatus || []
     });
 
     return json({ ok: true, emailsSent });
@@ -449,23 +460,46 @@ async function sendBrevo(env, { to, cc, subject, html }) {
     // -------------------------------
 async function sendSMS(env, { to, message }) {
   if (!env.SMS_PROVIDER_API_KEY) {
-  console.warn("SMS skipped — no Brevo API key");
-  return;
+    console.warn("SMS skipped — no Brevo API key");
+    return { ok: false, error: "Missing API key" };
+  }
+
+  const res = await fetch(
+    "https://api.brevo.com/v3/transactionalSMS/send",
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "authorization": `Bearer ${env.SMS_PROVIDER_API_KEY}`
+      },
+      body: JSON.stringify({
+        from: env.SMS_SENDER_ID || "USSignal OnCall",
+        to,
+        message
+      })
+    }
+  );
+
+  const text = await res.text();
+  let data = {};
+  try { data = JSON.parse(text); } catch {}
+
+  if (!res.ok) {
+    console.error("SMS FAILED", res.status, data || text);
+    return {
+      ok: false,
+      status: res.status,
+      error: data?.message || text
+    };
+  }
+
+  return {
+    ok: true,
+    messageId: data.messageId || null
+  };
 }
 
-  await fetch("https://api.brevo.com/v3/transactionalSMS/send", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "authorization": `Bearer ${env.SMS_PROVIDER_API_KEY}`
-    },
-    body: JSON.stringify({
-      from: env.SMS_SENDER_ID || "USSignal OnCall",
-      to,
-      message
-    })
-  });
-}
+    
 // Persist notification marker in schedule
 const scheduleRaw = await env.ONCALL_KV.get("ONCALL:SCHEDULE");
 if (scheduleRaw) {
