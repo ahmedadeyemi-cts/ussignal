@@ -685,3 +685,11 @@ body {
   background: #10b981;
 }
 
+.notify-badges {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.notify-badge.email { background:#e0f2fe; }
+.notify-badge.sms { background:#ecfeff; }
