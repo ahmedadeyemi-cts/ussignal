@@ -401,6 +401,19 @@ if (scheduleRaw) {
     );
   }
 }
+await audit(env, {
+  action: entryId ? "MANUAL_NOTIFY_ENTRY" : "MANUAL_NOTIFY_ACTIVE",
+  mode,
+  entryId,
+  emailsSent,
+  actor: payload.auto ? "system" : "admin",
+
+  // ✅ ADD THESE
+  emails: to.map(r => r.email),
+  phones: Object.values(entry.departments || {})
+    .map(p => p.phone)
+    .filter(Boolean)
+});
 
 /* ================================================= */
 
