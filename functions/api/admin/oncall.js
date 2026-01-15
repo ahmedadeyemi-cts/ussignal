@@ -10,7 +10,7 @@ export async function onRequest({ request, env }) {
   let schedule;
 
   try {
-    const raw = await env.ONCALL_KV.get("ONCALL:CURRENT");
+    const raw = await env.ONCALL_KV.get("ONCALL:SCHEDULE");
 
     if (raw) {
       const parsed = JSON.parse(raw);
