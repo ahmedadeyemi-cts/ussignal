@@ -69,12 +69,17 @@ if (missing.length) {
       return json({ error: "No schedule found" }, 400);
     }
 
-    const schedule = JSON.parse(raw);
-    const entries = schedule.entries || [];
+    const current = JSON.parse(raw);
 
-    if (!entries.length) {
-      return json({ error: "No entries available" }, 400);
-    }
+// Normalize into an array so the rest of the code works
+const entries = Array.isArray(current.entries)
+  ? current.entries
+  : [current];
+
+if (!entries.length) {
+  return json({ error: "No on-call entry available" }, 400);
+}
+
 
 // -------------------------------
 // Determine target entries (timezone-aware)
@@ -327,10 +332,8 @@ if (notifyType === "START_TODAY") {
       entry.notifiedBy = payload.auto ? "system" : "admin";
 
     }
-    await env.ONCALL_KV.put(
-  "ONCALL:CURRENT",
-  JSON.stringify(schedule)
-);
+// DO NOT overwrite ONCALL:CURRENT here
+// It is derived ONLY by save.js
 
 
     // -------------------------------
@@ -389,9 +392,9 @@ async function sendBrevo(env, { to, cc, subject, html }) {
     // -------------------------------
 async function sendSMS(env, { to, message }) {
   if (!env.BREVO_API_KEY) {
-    console.warn("SMS skipped — no API key");
-    return;
-  }
+  console.warn("SMS skipped — no Brevo API key");
+  return;
+}
 
   await fetch("https://api.brevo.com/v3/transactionalSMS/send", {
     method: "POST",
