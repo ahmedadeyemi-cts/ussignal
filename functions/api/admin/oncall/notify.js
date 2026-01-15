@@ -3,6 +3,18 @@ export async function onRequest({ request, env }) {
     // -------------------------------
     // Auth
     // -------------------------------
+    const BRAND = {
+  primary: "#002B5C", // US Signal Navy
+  accent: "#E5E7EB",
+  logo: "https://oncall.onenecklab.com/ussignal.jpg",
+  footer: "© US Signal. All rights reserved."
+};
+
+    const DEPT_LABELS = {
+      enterprise_network: "Enterprise Network",
+      collaboration: "Collaboration Systems",
+      system_storage: "System & Storage"
+    };
     const jwt = request.headers.get("cf-access-jwt-assertion");
     if (!jwt) {
       return json({ error: "Unauthorized" }, 401);
@@ -117,16 +129,45 @@ if (missing.length) {
             // -------------------------------
       // Prevent duplicate notifications
       // -------------------------------
-      if (entry.notifiedAt) {
-        console.warn(
-          "Notify skipped — already notified",
-          {
-            entryId: entry.id,
-            notifiedAt: entry.notifiedAt
-          }
-        );
-        continue;
-      }
+     if (entry.notifiedAt) {
+  console.warn("Notify skipped — already notified", {
+    entryId: entry.id,
+    notifiedAt: entry.notifiedAt
+  });
+  continue;
+}
+          // -------------------------------
+// Dynamic date formatting (per entry)
+// -------------------------------
+const start = new Date(entry.startISO);
+const end = new Date(entry.endISO);
+
+const fmt = (d) =>
+  d.toLocaleString("en-US", {
+    timeZone: "America/Chicago",
+    weekday: "long",
+    month: "2-digit",
+    day: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true
+  }) + " CST";
+
+const startLabel = fmt(start);
+const endLabel = fmt(end);
+
+const weekStart = start.toLocaleDateString("en-US", {
+  month: "2-digit",
+  day: "2-digit",
+  year: "numeric"
+});
+const isUpcoming =
+  start > new Date() &&
+  start.getTime() - Date.now() > 24 * 60 * 60 * 1000;
+
+const notifyType = isUpcoming ? "UPCOMING" : "START_TODAY";
 
       const to = [];
 const teamLines = [];
@@ -141,9 +182,16 @@ if (entry.departments && typeof entry.departments === "object") {
       name: person.name || team
     });
 
-    teamLines.push(
-      `<li><strong>${team}</strong>: ${person.name || ""} (${person.email})</li>`
-    );
+   const label = DEPT_LABELS[team] || team;
+
+teamLines.push(`
+  <li>
+    <strong>${label}</strong>: ${person.name || ""}
+    <br/>Email: ${person.email || "—"}
+    <br/>Phone: ${person.phone || "—"}
+  </li>
+`);
+
   }
 }
 
@@ -174,39 +222,97 @@ else if (entry.email) {
 
 
       const subject =
-        mode === "start"
-          ? "On-Call Duty Started"
-          : mode === "end"
-          ? "On-Call Duty Ending"
-          : "You Are Currently On Call";
+  notifyType === "UPCOMING"
+    ? `REMINDER: ONCALL FOR WEEK STARTING ${weekStart}`
+    : `ONCALL STARTS TODAY – ${weekStart}`;
 
-      const html = `
-        <p>Hello,</p>
-        <p>
-          ${
-            mode === "start"
-              ? "Your on-call duty has started."
-              : mode === "end"
-              ? "Your on-call duty is ending."
-              : "You are currently on call."
-          }
-        </p>
+     const html =
+  notifyType === "UPCOMING"
+    ? `
+<table width="100%" cellpadding="0" cellspacing="0" style="font-family: Arial, sans-serif; background:#f4f6f8; padding:24px;">
+  <tr>
+    <td>
+      <img src="${BRAND.logo}" alt="US Signal" style="max-width:180px;margin-bottom:16px;" />
 
-        <ul>${teamLines.join("")}</ul>
+<h2 style="color:${BRAND.primary};">On-Call Reminder</h2>
 
-        <p>
-          View the full on-call schedule:<br/>
-          <a href="${portal}">${portal}</a>
-        </p>
-      `;
 
+      <p>
+        This is an <strong>REMINDER</strong> message. You are scheduled to provide
+        on-call support during the upcoming week.
+      </p>
+
+      <p><strong>On-call support begins:</strong><br/>${startLabel}</p>
+      <p><strong>On-call support ends:</strong><br/>${endLabel}</p>
+
+      <p>
+        If you need to make changes, please contact your Team Lead or Manager.
+      </p>
+
+      <hr style="border:none;border-top:1px solid ${BRAND.accent};margin:24px 0;" />
+
+      <ul>${teamLines.join("")}</ul>
+
+      <p>
+        View the full on-call schedule:<br/>
+        <a href="${portal}">${portal}</a>
+      </p>
+      <p style="margin-top:32px;font-size:12px;color:#6b7280;text-align:center;">
+  ${BRAND.footer}
+</p>
+
+    </td>
+  </tr>
+</table>
+`
+    : `
+<table width="100%" cellpadding="0" cellspacing="0" style="font-family: Arial, sans-serif; background:#fff7ed; padding:24px;">
+  <tr>
+    <td>
+     <img src="${BRAND.logo}" alt="US Signal" style="max-width:180px;margin-bottom:16px;" />
+
+<h2 style="color:${BRAND.primary};">On-Call Starts Today</h2>
+
+
+      <p>
+        This is a notification that your <strong>on-call duty begins today</strong>.
+      </p>
+
+      <p><strong>Start:</strong><br/>${startLabel}</p>
+      <p><strong>End:</strong><br/>${endLabel}</p>
+
+      <hr style="border:none;border-top:1px solid ${BRAND.accent};margin:24px 0;" />
+
+      <ul>${teamLines.join("")}</ul>
+
+      <p>
+        Access the on-call portal:<br/>
+        <a href="${portal}">${portal}</a>
+      </p>
+      <p style="margin-top:32px;font-size:12px;color:#6b7280;text-align:center;">
+  ${BRAND.footer}
+</p>
+
+    </td>
+  </tr>
+</table>
+`;
       await sendBrevo(env, {
         to,
         cc: admins,
         subject,
         html
       });
+if (notifyType === "START_TODAY") {
+  for (const [_, person] of Object.entries(entry.departments || {})) {
+    if (!person?.phone) continue;
 
+    await sendSMS(env, {
+      to: person.phone,
+      message: `US Signal On-Call: Your on-call duty starts now and ends ${endLabel}.`
+    });
+  }
+}
       emailsSent++;
       entry.notifiedAt = new Date().toISOString();
       entry.notifyMode = mode;
@@ -270,6 +376,28 @@ async function sendBrevo(env, { to, cc, subject, html }) {
   throw new Error(`Brevo error (${res.status}): ${text}`);
 }
 }
+    // -------------------------------
+    // SMS Sending
+    // -------------------------------
+async function sendSMS(env, { to, message }) {
+  if (!env.SMS_PROVIDER_API_KEY) {
+    console.warn("SMS skipped — no API key");
+    return;
+  }
+
+  await fetch("https://api.brevo.com/v3/transactionalSMS/send ", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "authorization": `Bearer ${env.SMS_PROVIDER_API_KEY}`
+    },
+    body: JSON.stringify({
+      from: env.SMS_SENDER_ID || "USSignal OnCall",
+      to,
+      message
+    })
+  });
+}
 
 async function audit(env, record) {
   const raw = (await env.ONCALL_KV.get("ONCALL:AUDIT")) || "[]";
@@ -290,6 +418,9 @@ async function audit(env, record) {
 function json(obj, status = 200) {
   return new Response(JSON.stringify(obj), {
     status,
-    headers: { "content-type": "application/json" }
+    headers: {
+      "content-type": "application/json",
+      "cache-control": "no-store"
+    }
   });
 }
