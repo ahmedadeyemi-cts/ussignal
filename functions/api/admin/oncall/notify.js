@@ -317,6 +317,15 @@ else if (entry.email) {
         subject,
         html
       });
+      // -------------------------------
+// Persist EMAIL notification state
+// -------------------------------
+entry.notification = entry.notification || {};
+entry.notification.email = {
+  sentAt: new Date().toISOString(),
+  subject
+};
+
 if (notifyType === "START_TODAY") {
   for (const [_, person] of Object.entries(entry.departments || {})) {
     if (!person?.phone) continue;
@@ -327,10 +336,44 @@ if (notifyType === "START_TODAY") {
     });
   }
 }
+      // -------------------------------
+// Persist SMS notification state
+// -------------------------------
+entry.notification = entry.notification || {};
+entry.notification.sms = {
+  sentAt: new Date().toISOString()
+};
+
       emailsSent++;
       entry.notifiedAt = new Date().toISOString();
       entry.notifyMode = mode;
       entry.notifiedBy = payload.auto ? "system" : "admin";
+      // -------------------------------
+// Persist notification state to ONCALL:SCHEDULE
+// -------------------------------
+const scheduleRaw = await env.ONCALL_KV.get("ONCALL:SCHEDULE");
+
+if (scheduleRaw) {
+  const schedule = JSON.parse(scheduleRaw);
+  const target = schedule.entries.find(e => e.id === entry.id);
+
+  if (target) {
+    target.notification = entry.notification;
+    target.notifiedAt = entry.notifiedAt;
+    target.notifyMode = entry.notifyMode;
+    target.notifiedBy = entry.notifiedBy;
+
+    await env.ONCALL_KV.put(
+      "ONCALL:SCHEDULE",
+      JSON.stringify({
+        ...schedule,
+        updatedAt: new Date().toISOString(),
+        updatedBy: "notify"
+      })
+    );
+  }
+}
+
 
     }
 // DO NOT overwrite ONCALL:CURRENT here
