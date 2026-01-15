@@ -191,6 +191,40 @@ function getAutoNotifyTime(entry) {
   start.setMinutes(start.getMinutes() - 30);
   return start;
 }
+async function openNotifyTimeline(entryId) {
+  const res = await fetchAuth(`/api/admin/audit`, { method: "GET" });
+  if (!res.ok) {
+    toast("Unable to load notification timeline.");
+    return;
+  }
+
+  const data = await res.json();
+  const events = (data.entries || []).filter(e =>
+    e.entryId === entryId &&
+    String(e.action || "").includes("NOTIFY")
+  );
+
+  const body =
+    events.length
+      ? `<ul class="timeline-list">
+          ${events.map(e => `
+            <li>
+              <b>${escapeHtml(e.action)}</b><br/>
+              ${new Date(e.ts).toLocaleString("en-US")} ·
+              ${escapeHtml(e.actor || "system")}
+            </li>
+          `).join("")}
+        </ul>`
+      : `<div class="subtle">No notifications sent for this entry.</div>`;
+
+  showModal(
+    "Notification Timeline",
+    body,
+    "Close",
+    () => true,
+    ""
+  );
+}
 
 /* =========================
  * Init
@@ -1216,14 +1250,21 @@ async function loadScheduleAdmin(el) {
  APP_STATE.notifyStatus = {};
 
 (data.entries || []).forEach(e => {
+  if (e.notification) {
+    APP_STATE.notifyStatus[e.id] = e.notification;
+    return;
+  }
+
+  // backward compatibility
   if (e.notifiedAt) {
     APP_STATE.notifyStatus[e.id] = {
-  sentAt: e.notifiedAt,
-  mode: e.notifyMode || "both",
-  by: e.notifiedBy || "admin"
-};
+      email: { sentAt: e.notifiedAt },
+      sms: e.notifyMode === "both" ? { sentAt: e.notifiedAt } : null,
+      by: e.notifiedBy || "admin"
+    };
   }
 });
+
 
   renderScheduleAdmin(el);
   refreshTimeline();
@@ -1309,13 +1350,23 @@ function renderScheduleAdmin(el) {
   }
 </div>
 ${
-  APP_STATE.notifyStatus[e.id]
-    ? `<span class="notify-badge notified">
-         🔔 Notified (${APP_STATE.notifyStatus[e.id].by})
-       </span>`
-    : `<span class="notify-badge pending">⏳ Pending</span>`
-}
+  (() => {
+    const n = APP_STATE.notifyStatus[e.id];
+    if (!n) return `<span class="notify-badge pending">⏳ Pending</span>`;
 
+    return `
+      <div class="notify-badges">
+        ${n.email ? `<span class="notify-badge email">📧 Email</span>` : ""}
+        ${n.sms ? `<span class="notify-badge sms">📱 SMS</span>` : ""}
+        <button class="ghost small"
+          data-action="notifyTimeline"
+          data-id="${escapeHtml(String(e.id))}">
+          🕒 Timeline
+        </button>
+      </div>
+    `;
+  })()
+}
 
                   <div class="small subtle">CST</div>
                 `
@@ -1346,7 +1397,10 @@ ${
       </div>
     `;
   });
-
+if (action === "notifyTimeline") {
+  await openNotifyTimeline(id);
+  return;
+}
   el.querySelectorAll("button[data-action]").forEach(btn => {
     btn.onclick = async () => {
       const action = btn.getAttribute("data-action");
@@ -2242,10 +2296,10 @@ setInterval(async () => {
         });
 
         APP_STATE.notifyStatus[e.id] = {
-          sentAt: new Date().toISOString(),
-          mode: "both",
-          auto: true
-        };
+  email: { sentAt: new Date().toISOString() },
+  sms: { sentAt: new Date().toISOString() },
+  auto: true
+};
 
         renderScheduleAdmin(byId("schedule"));
       } catch (err) {
