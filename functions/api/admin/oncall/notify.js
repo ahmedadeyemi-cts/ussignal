@@ -410,6 +410,27 @@ async function sendSMS(env, { to, message }) {
     })
   });
 }
+// Persist notification marker in schedule
+const scheduleRaw = await env.ONCALL_KV.get("ONCALL:SCHEDULE");
+if (scheduleRaw) {
+  const schedule = JSON.parse(scheduleRaw);
+
+  const target = schedule.entries.find(e => e.id === entry.id);
+  if (target) {
+    target.notifiedAt = new Date().toISOString();
+    target.notifiedType = notifyType;
+    target.notifiedBy = payload.auto ? "system" : "admin";
+
+    await env.ONCALL_KV.put(
+      "ONCALL:SCHEDULE",
+      JSON.stringify({
+        ...schedule,
+        updatedAt: new Date().toISOString(),
+        updatedBy: "notify"
+      })
+    );
+  }
+}
 
 async function audit(env, record) {
   const raw = (await env.ONCALL_KV.get("ONCALL:AUDIT")) || "[]";
