@@ -8,9 +8,14 @@ id = "YOUR_KV_ID"
 
 [vars]
 BASE_URL = "https://oncall.onenecklab.com"
+TIMEZONE = "America/Chicago"
+
+# ---- FEATURE FLAGS ----
+DRY_RUN = "false"         # true = log only, no sends
+NOTIFY_MODE = "both"      # email | sms | both
 
 [triggers]
 crons = [
-  "0 9 * * 1",  # Monday 9am
-  "0 9 * * 5"   # Friday 9am
+  "0 9 * * 1",  # Monday 9am CT
+  "0 9 * * 5"   # Friday 9am CT
 ]
