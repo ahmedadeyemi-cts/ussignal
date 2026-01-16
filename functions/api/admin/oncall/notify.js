@@ -384,6 +384,16 @@ await audit(env, {
       .filter(Boolean)
   )
 });
+    return json({ ok: true, emailsSent });
+  } catch (err) {
+    console.error("NOTIFY ERROR:", err);
+    return json(
+      { error: "Notify failed", detail: err.message },
+      500
+    );
+  }
+}
+
 /* ================================================= */
 
 async function sendBrevo(env, { to, cc, subject, html }) {
@@ -457,30 +467,7 @@ async function sendSMS(env, { to, message }) {
   };
 }
 
-    
-// Persist notification marker in schedule
-const scheduleRaw = await env.ONCALL_KV.get("ONCALL:SCHEDULE");
-if (scheduleRaw) {
-  const schedule = JSON.parse(scheduleRaw);
-
-  const target = schedule.entries.find(e => e.id === entry.id);
-  if (target) {
-    target.notifiedAt = new Date().toISOString();
-    target.notifiedType = notifyType;
-    target.notifiedBy = payload.auto ? "system" : "admin";
-
-    await env.ONCALL_KV.put(
-      "ONCALL:SCHEDULE",
-      JSON.stringify({
-        ...schedule,
-        updatedAt: new Date().toISOString(),
-        updatedBy: "notify"
-      })
-    );
-  }
-}
-
-async function audit(env, record) {
+    async function audit(env, record) {
   const raw = (await env.ONCALL_KV.get("ONCALL:AUDIT")) || "[]";
   const audit = JSON.parse(raw);
 
