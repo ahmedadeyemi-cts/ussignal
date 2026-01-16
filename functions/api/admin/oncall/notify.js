@@ -358,60 +358,13 @@ entry.notification.sms = {
       entry.notifiedAt = new Date().toISOString();
       entry.notifyMode = mode;
       entry.notifiedBy = payload.auto ? "system" : "admin";
-      // -------------------------------
-// Persist notification state to ONCALL:SCHEDULE
-// -------------------------------
-const scheduleRaw = await env.ONCALL_KV.get("ONCALL:SCHEDULE");
-
-if (scheduleRaw) {
-  const schedule = JSON.parse(scheduleRaw);
-  const target = schedule.entries.find(e => e.id === entry.id);
-
-  if (target) {
-    target.notification = entry.notification;
-    target.notifiedAt = entry.notifiedAt;
-    target.notifyMode = entry.notifyMode;
-    target.notifiedBy = entry.notifiedBy;
-
-    await env.ONCALL_KV.put(
-      "ONCALL:SCHEDULE",
-      JSON.stringify({
-        ...schedule,
-        updatedAt: new Date().toISOString(),
-        updatedBy: "notify"
-      })
-    );
-  }
-}
-
-
     }
 // DO NOT overwrite ONCALL:CURRENT here
 // It is derived ONLY by save.js
 
-
-    // -------------------------------
-    // Audit
-    // -------------------------------
-    await audit(env, {
-      action: entryId ? "MANUAL_NOTIFY_ENTRY" : "MANUAL_NOTIFY_ACTIVE",
-      mode,
-      entryId,
-      emailsSent,
-      actor: payload.auto ? "system" : "admin",
-      sms: entry.smsStatus || []
-    });
-
-    return json({ ok: true, emailsSent });
-
-  } catch (err) {
-    console.error("NOTIFY ERROR:", err);
-    return json(
-      { error: "Notify failed", detail: err.message },
-      500
-    );
-  }
-}
+// -------------------------------
+// Audit (FINAL – Pages-safe)
+// -------------------------------
 await audit(env, {
   action: entryId ? "MANUAL_NOTIFY_ENTRY" : "MANUAL_NOTIFY_ACTIVE",
   mode,
@@ -419,13 +372,18 @@ await audit(env, {
   emailsSent,
   actor: payload.auto ? "system" : "admin",
 
-  // ✅ ADD THESE
-  emails: to.map(r => r.email),
-  phones: Object.values(entry.departments || {})
-    .map(p => p.phone)
-    .filter(Boolean)
-});
+  emails: targets.flatMap(e =>
+    Object.values(e.departments || {})
+      .map(p => p.email)
+      .filter(Boolean)
+  ),
 
+  phones: targets.flatMap(e =>
+    Object.values(e.departments || {})
+      .map(p => p.phone)
+      .filter(Boolean)
+  )
+});
 /* ================================================= */
 
 async function sendBrevo(env, { to, cc, subject, html }) {
