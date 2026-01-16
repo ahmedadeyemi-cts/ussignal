@@ -208,8 +208,9 @@ async function openNotifyTimeline(entryId) {
   events.length
     ? `<ul class="timeline-list">
         ${events.map(e => {
-          const phones = (e.phones || []).join(", ");
-          const emails = (e.emails || []).join(", ");
+          const phones = (e.sms || []).map(s => s.phone).join(", ");
+          const emails = e.emailsSent ? "Email sent" : "";
+
 
           return `
             <li>
@@ -1270,13 +1271,13 @@ async function loadScheduleAdmin(el) {
   }
 
   // backward compatibility
-  if (e.notifiedAt) {
-    APP_STATE.notifyStatus[e.id] = {
-      email: { sentAt: e.notifiedAt },
-      sms: e.notifyMode === "both" ? { sentAt: e.notifiedAt } : null,
-      by: e.notifiedBy || "admin"
-    };
-  }
+  if (e.notifiedAt || Array.isArray(e.smsStatus)) {
+  APP_STATE.notifyStatus[e.id] = {
+    email: e.notifiedAt ? { sentAt: e.notifiedAt } : null,
+    sms: Array.isArray(e.smsStatus) ? e.smsStatus : [],
+    by: e.notifiedBy || "admin"
+  };
+}
 });
 
 
@@ -1371,7 +1372,12 @@ ${
     return `
       <div class="notify-badges">
         ${n.email ? `<span class="notify-badge email">📧 Email</span>` : ""}
-        ${n.sms ? `<span class="notify-badge sms">📱 SMS</span>` : ""}
+        ${n.sms?.some(s => s.ok)
+  ? `<span class="notify-badge sms">📱 SMS</span>`
+  : ""}
+${n.sms?.some(s => !s.ok)
+  ? `<span class="notify-badge error">⚠ SMS Failed</span>`
+  : ""}
         <button class="ghost small"
           data-action="notifyTimeline"
           data-id="${escapeHtml(String(e.id))}">
@@ -1422,14 +1428,15 @@ ${
       </div>
     `;
   });
-if (action === "notifyTimeline") {
-  await openNotifyTimeline(id);
-  return;
-}
   el.querySelectorAll("button[data-action]").forEach(btn => {
     btn.onclick = async () => {
       const action = btn.getAttribute("data-action");
       const id = btn.getAttribute("data-id");
+      if (action === "notifyTimeline") {
+  await openNotifyTimeline(id);
+  return;
+}
+
 
      if (action === "edit") {
   const entry = APP_STATE.draftSchedule?.entries?.find(e => String(e.id) === String(id));
@@ -1476,10 +1483,14 @@ if (action === "notifyEntry") {
       if (!res.ok) throw new Error(await res.text());
 
       APP_STATE.notifyStatus[id] = {
-        sentAt: new Date().toISOString(),
-        mode: "both",
-        retried: !!already
-      };
+  email: { sentAt: new Date().toISOString() },
+  sms: Array.isArray(APP_STATE.notifyStatus[id]?.sms)
+    ? APP_STATE.notifyStatus[id].sms
+    : [],
+  by: "admin",
+  auto: false
+};
+
 
       renderScheduleAdmin(el);
       toast(already ? "Notifications resent." : "Notifications sent.");
@@ -1511,7 +1522,20 @@ if (action === "notifySMS") {
 
       // Persist UI state
       APP_STATE.notifyStatus[id] ||= {};
-      APP_STATE.notifyStatus[id].sms = { sentAt: new Date().toISOString() };
+      APP_STATE.notifyStatus[id] ||= {
+  email: null,
+  sms: [],
+  by: "admin",
+  auto: false
+};
+
+APP_STATE.notifyStatus[id].sms.unshift({
+  phone: "—",            // real phone comes from worker response later
+  ok: true,
+  status: "queued",
+  ts: new Date().toISOString()
+});
+
 
       renderScheduleAdmin(el);
       toast("SMS notification sent.");
@@ -1841,8 +1865,22 @@ async function sendNotify() {
     body: JSON.stringify({ mode: "both" })
   });
   if (!res.ok) throw new Error(await res.text());
+
+  // ✅ update UI state immediately
+  const now = new Date().toISOString();
+  (APP_STATE.scheduleFull?.entries || []).forEach(e => {
+    APP_STATE.notifyStatus[e.id] = {
+      email: { sentAt: now },
+      sms: [],          // keep as array for compatibility
+      by: "admin"
+    };
+  });
+
+  renderScheduleAdmin(byId("schedule"));
   toast("Notifications sent.");
 }
+
+
 
 async function revertSchedule() {
   const res = await fetchAuth(`/api/admin/oncall/revert`, { method: "POST" });
@@ -2312,13 +2350,14 @@ function renderTimelineBlocks(entry) {
     const p = depts[dep] || {};
     const label = DEPT_LABELS[dep] || dep;
 
-    return `
-      <div class="timeline-block"
-           style="left:${i * width}%;width:${width}%;background:${deptColor(dep)}"
-           title="${escapeHtml(label)} — ${escapeHtml(p.name || "")}">
-        <div class="timeline-block-title">${escapeHtml(label)}</div>
-        <div class="timeline-block-name">${escapeHtml(p.name || "")}</div>
-      </div>
+   return `
+  <div class="timeline-block"
+       style="left:${i * width}%;width:${width}%;background:${deptColor(dep)}"
+       title="${escapeHtml(label)} — ${escapeHtml(p.name || "")} — ${escapeHtml(p.phone || "")}">
+    <div class="timeline-block-title">${escapeHtml(label)}</div>
+    <div class="timeline-block-name">${escapeHtml(p.name || "")}</div>
+    <div class="small">${escapeHtml(p.phone || "")}</div>
+  </div>
     `;
   }).join("");
 }
@@ -2335,7 +2374,7 @@ setInterval(async () => {
   const now = Date.now();
 
   for (const e of entries) {
-    if (APP_STATE.notifyStatus[e.id]) continue;
+    if (e.notifiedAt || APP_STATE.notifyStatus[e.id]) continue;
 
     const t = getAutoNotifyTime(e);
     if (!t) continue;
@@ -2354,9 +2393,11 @@ setInterval(async () => {
 
         APP_STATE.notifyStatus[e.id] = {
   email: { sentAt: new Date().toISOString() },
-  sms: { sentAt: new Date().toISOString() },
+  sms: [],
+  by: "system",
   auto: true
 };
+
 
         renderScheduleAdmin(byId("schedule"));
       } catch (err) {
