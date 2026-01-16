@@ -34,14 +34,20 @@ export async function onRequest({ env }) {
       return json({ ok: true, reason: "No schedule found" });
     }
 
-    const schedule = JSON.parse(raw);
-    const entries = Array.isArray(schedule.entries)
-      ? schedule.entries
-      : [];
+    const current = JSON.parse(raw);
 
-    if (!entries.length) {
-      return json({ ok: true, reason: "No entries available" });
-    }
+// Normalize to array
+const entries = Array.isArray(current.entries)
+  ? current.entries
+  : [current];
+
+if (!entries.length || !entries[0]?.startISO) {
+  return json({ ok: true, reason: "No entries available" });
+}
+
+// Wrap into schedule shape for downstream functions
+const schedule = { entries };
+
 
     // --------------------------------------------------
     // DATE CONTEXT (UTC)
@@ -92,9 +98,9 @@ export async function onRequest({ env }) {
     // SAVE UPDATED SCHEDULE (persist notify state)
     // --------------------------------------------------
     await env.ONCALL_KV.put(
-      "ONCALL:CURRENT",
-      JSON.stringify(schedule)
-    );
+  "ONCALL:CURRENT",
+  JSON.stringify(entries[0])
+);
 
     return json({
       ok: true,
