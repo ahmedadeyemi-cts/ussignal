@@ -1,0 +1,16 @@
+name = "oncall-cron"
+main = "worker.js"
+compatibility_date = "2026-01-16"
+
+[[kv_namespaces]]
+binding = "ONCALL_KV"
+id = "YOUR_KV_ID"
+
+[vars]
+BASE_URL = "https://oncall.onenecklab.com"
+
+[triggers]
+crons = [
+  "0 9 * * 1",  # Monday 9am
+  "0 9 * * 5"   # Friday 9am
+]
