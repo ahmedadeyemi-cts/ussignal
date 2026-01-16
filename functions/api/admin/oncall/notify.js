@@ -410,18 +410,18 @@ async function sendBrevo(env, { to, cc, subject, html }) {
       },
       to,
       cc: Array.isArray(cc) && cc.length
-  ? cc.map(email => ({ email }))
-  : undefined,
+        ? cc.map(email => ({ email }))
+        : undefined,
       subject,
       htmlContent: html
     })
   });
 
   if (!res.ok) {
-  const text = await res.text();
-  console.error("BREVO RESPONSE:", res.status, text);
-  throw new Error(`Brevo error (${res.status}): ${text}`);
-}
+    const text = await res.text();
+    console.error("BREVO RESPONSE:", res.status, text);
+    throw new Error(`Brevo error (${res.status}): ${text}`);
+  }
 }
     // -------------------------------
     // SMS Sending
