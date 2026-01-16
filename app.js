@@ -977,9 +977,12 @@ async function loadSchedulePublic(el) {
   const data = await res.json();
 
   // Normalize public payload
-  APP_STATE.schedulePublic = {
-    entries: data?.schedule?.entries || []
-  };
+  const normalized = normalizeScheduleResponse(data);
+
+APP_STATE.schedulePublic = {
+  entries: normalized.entries || []
+};
+
 
   renderScheduleReadOnly(el, APP_STATE.schedulePublic.entries);
   refreshTimeline();
