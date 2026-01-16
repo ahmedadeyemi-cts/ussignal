@@ -4,7 +4,8 @@ export async function onRequest({ env }) {
     // Load CURRENT on-call schedule
     // (public-safe, read-only)
     // -----------------------------------
-    const raw = await env.ONCALL_KV.get("ONCALL:CURRENT");
+    // 🔑 Load FULL schedule (not CURRENT)
+const raw = await env.ONCALL_KV.get("ONCALL:SCHEDULE");
 
     const schedule = raw
       ? JSON.parse(raw)
