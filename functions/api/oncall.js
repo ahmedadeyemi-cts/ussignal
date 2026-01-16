@@ -1,7 +1,7 @@
 export async function onRequest({ env }) {
   try {
     // -----------------------------------
-    // Load FULL schedule for public view
+    // Load FULL schedule for public views
     // -----------------------------------
     const raw =
       (await env.ONCALL_KV.get("ONCALL:SCHEDULE")) ||
