@@ -755,4 +755,27 @@ body {
   text-decoration: underline;
   font-weight: 500;
 }
+.archived-wrapper {
+  margin-top: 18px;
+}
 
+.archived-wrapper > summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #374151;
+  padding: 10px 0;
+}
+
+.archived-wrapper[open] > summary {
+  margin-bottom: 10px;
+}
+
+.archived-badge {
+  margin-left: 8px;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  color: #374151;
+  font-weight: 600;
+}
