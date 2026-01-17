@@ -250,7 +250,6 @@
 <nav class="tabs" role="tablist">
   <button class="tab" data-tab="scheduleTab" role="tab">Full Schedule</button>
   <button class="tab" data-tab="currentTab" role="tab">Who’s On Call Now</button>
-  <button class="tab active" data-tab="timelineTab" role="tab">Timeline</button>
 </nav>
 
 <main class="container">
@@ -266,11 +265,6 @@
       <div class="subtle">Live · Read-only · Auto-updated</div>
     </div>
     <div id="currentOnCall" class="live-card"></div>
-  </section>
-
-  <section id="timelineTab" class="panel" role="tabpanel">
-    <h2>Weekly Timeline</h2>
-    <div id="timeline"></div>
   </section>
 
 </main>
@@ -300,7 +294,7 @@
     if (e.key === "ArrowRight" && tabs[active+1]) activate(tabs[active+1].dataset.tab);
     if (e.key === "ArrowLeft" && tabs[active-1]) activate(tabs[active-1].dataset.tab);
     if (e.key === "Home") activate("scheduleTab");
-    if (e.key === "End") activate("timelineTab");
+    if (e.key === "End") activate("currentTab");
 
   });
 
