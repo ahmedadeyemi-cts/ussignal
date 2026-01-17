@@ -149,12 +149,11 @@ async function sendBrevo(env, { to, subject, html }) {
     })
   });
 
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Brevo error ${res.status}: ${text}`);
-  }
-  if (!res.ok) {
-  const text = await res.text();
+const text = await res.text();
+console.log("BREVO RESPONSE STATUS:", res.status);
+console.log("BREVO RESPONSE BODY:", text);
+
+if (!res.ok) {
   throw new Error(`Brevo error ${res.status}: ${text}`);
 }
 }
