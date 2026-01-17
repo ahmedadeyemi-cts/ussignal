@@ -240,7 +240,29 @@ async function openNotifyTimeline(entryId) {
     ""
   );
 }
+async function loadCronHealth() {
+  try {
+    const res = await fetch("/api/admin/oncall/cron-health");
+    const data = await res.json();
 
+    const el = document.getElementById("cron-health-output");
+    el.textContent = JSON.stringify(data, null, 2);
+
+    if (data.status === "failure") {
+      el.style.color = "#dc2626";
+    } else if (data.status === "blocked") {
+      el.style.color = "#f59e0b";
+    } else {
+      el.style.color = "#16a34a";
+    }
+  } catch (e) {
+    document.getElementById("cron-health-output").textContent =
+      "Failed to load cron health";
+  }
+}
+
+loadCronHealth();
+setInterval(loadCronHealth, 60_000);
 /* =========================
  * Init
  * ========================= */
