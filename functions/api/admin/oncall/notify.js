@@ -60,7 +60,6 @@ if (missing.length) {
 
     const mode = payload.mode || "both"; // both | start | end
     const entryId = payload.entryId || null;
-
     // -------------------------------
     // Load current schedule
     // -------------------------------
@@ -140,17 +139,9 @@ const now = new Date(
     let emailsSent = 0;
 
     for (const entry of targets) {
-            // -------------------------------
-      // Prevent duplicate notifications
-      // -------------------------------
-     if (entry.notifiedAt) {
-  console.warn("Notify skipped — already notified", {
-    entryId: entry.id,
-    notifiedAt: entry.notifiedAt
-  });
-  continue;
-}
-          // -------------------------------
+      let smsSent = false;
+
+ // -------------------------------
 // Dynamic date formatting (per entry)
 // -------------------------------
 const start = new Date(entry.startISO);
@@ -182,6 +173,25 @@ const isUpcoming =
   start.getTime() - Date.now() > 24 * 60 * 60 * 1000;
 
 const notifyType = isUpcoming ? "UPCOMING" : "START_TODAY";
+      // -------------------------------
+// Prevent duplicate notifications
+// -------------------------------
+entry.notification ||= {};
+entry.notification.email ||= {};
+
+if (
+  notifyType === "UPCOMING" &&
+  entry.notification.email.upcoming
+) {
+  continue;
+}
+
+if (
+  notifyType === "START_TODAY" &&
+  entry.notification.email.start
+) {
+  continue;
+}
 
       const to = [];
 const teamLines = [];
@@ -311,31 +321,36 @@ else if (entry.email) {
   </tr>
 </table>
 `;
-      await sendBrevo(env, {
-        to,
-        cc: admins,
-        subject,
-        html
-      });
+      if (sendEmail) {
+  await sendBrevo(env, {
+    to,
+    cc: admins,
+    subject,
+    html
+  });
+}
       // -------------------------------
 // Persist EMAIL notification state
 // -------------------------------
-entry.notification = entry.notification || {};
-entry.notification.email = {
+entry.notification.email[
+  notifyType === "UPCOMING" ? "upcoming" : "start"
+] = {
   sentAt: new Date().toISOString(),
   subject
 };
 
+
 entry.smsStatus ||= [];
 
-if (notifyType === "START_TODAY") {
+if (allowSMS && notifyType === "START_TODAY") {
   for (const [_, person] of Object.entries(entry.departments || {})) {
     if (!person?.phone) continue;
 
     const sms = await sendSMS(env, {
-      to: person.phone,
-      message: `US Signal On-Call: Your on-call duty starts now and ends ${endLabel}.`
-    });
+  to: person.phone,
+  message: `US Signal On-Call: Your on-call duty starts now and ends ${endLabel}.`
+});
+if (sms.ok) smsSent = true;
 
     entry.smsStatus.push({
       phone: person.phone,
@@ -349,13 +364,13 @@ if (notifyType === "START_TODAY") {
       // -------------------------------
 // Persist SMS notification state
 // -------------------------------
-entry.notification = entry.notification || {};
-entry.notification.sms = {
-  sentAt: new Date().toISOString()
-};
-
+      if (smsSent) {
+  entry.notification.sms = {
+    sentAt: new Date().toISOString()
+  };
+}
       emailsSent++;
-      entry.notifiedAt = new Date().toISOString();
+  
       entry.notifyMode = mode;
       entry.notifiedBy = payload.auto ? "system" : "admin";
     }
@@ -427,18 +442,13 @@ async function sendBrevo(env, { to, cc, subject, html }) {
     // SMS Sending
     // -------------------------------
 async function sendSMS(env, { to, message }) {
-  if (!env.SMS_PROVIDER_API_KEY) {
-    console.warn("SMS skipped — no Brevo API key");
-    return { ok: false, error: "Missing API key" };
-  }
-
   const res = await fetch(
     "https://api.brevo.com/v3/transactionalSMS/send",
     {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        "authorization": `Bearer ${env.SMS_PROVIDER_API_KEY}`
+        "api-key": env.BREVO_API_KEY
       },
       body: JSON.stringify({
         from: env.SMS_SENDER_ID || "USSignal OnCall",
