@@ -240,49 +240,6 @@ async function openNotifyTimeline(entryId) {
     ""
   );
 }
-/* =========================
- * CRON HEALTH OUTPUT
- * ========================= */
-async function loadCronHealth() {
-  try {
-    const res = await fetch("/api/admin/oncall/cron-health");
-    const data = await res.json();
-
-    const el = document.getElementById("cron-health-output");
-    el.textContent = JSON.stringify(data, null, 2);
-
-    if (data.status === "failure") {
-      el.style.color = "#dc2626";
-    } else if (data.status === "blocked") {
-      el.style.color = "#f59e0b";
-    } else {
-      el.style.color = "#16a34a";
-    }
-  } catch (e) {
-    document.getElementById("cron-health-output").textContent =
-      "Failed to load cron health";
-  }
-}
-
-loadCronHealth();
-setInterval(loadCronHealth, 60_000);
-/* =========================
- * CRON HEALTH STATUS
- * ========================= */
-async function loadCronHealthstatus() {
-  try {
-    const res = await fetch("/api/admin/oncall/cron-health");
-    const data = await res.json();
-
-    const el = document.getElementById("cronHealthStatus");
-    if (!el) return;
-
-    el.textContent = JSON.stringify(data, null, 2);
-  } catch (e) {
-    const el = document.getElementById("cronHealthStatus");
-    if (el) el.textContent = "Failed to load cron health";
-  }
-}
 
 /* =========================
  * Init
@@ -2506,9 +2463,6 @@ document.addEventListener("DOMContentLoaded", () => {
   initApp(window.__APP_CTX__ || {}).catch(err => {
     console.error("App init failed:", err);
   });
-});
-document.addEventListener("DOMContentLoaded", () => {
-  loadCronHealthstatus();
 });
 
 
