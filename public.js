@@ -274,24 +274,20 @@ function renderTimelineBlocks(entry) {
 
     return `
       <div class="timeline-block">
-        <div class="timeline-block-title">
-          ${escapeHtml(prettyDept(dep))}
-        </div>
+        <div class="timeline-dept">${escapeHtml(prettyDept(dep))}</div>
 
-        <div class="timeline-block-name">
-          ${escapeHtml(name)}
-        </div>
+        <div class="timeline-name">${escapeHtml(name)}</div>
 
         ${
           email
-            ? `<div class="small">${escapeHtml(email)}</div>`
-            : `<div class="small subtle">—</div>`
+            ? `<div class="timeline-email">${escapeHtml(email)}</div>`
+            : ""
         }
 
         ${
           phone
-            ? `<a class="small tel-link" href="tel:${escapeHtml(tel)}">${escapeHtml(phone)}</a>`
-            : `<div class="small subtle">—</div>`
+            ? `<a class="timeline-phone" href="tel:${escapeHtml(tel)}">${escapeHtml(phone)}</a>`
+            : ""
         }
       </div>
     `;
