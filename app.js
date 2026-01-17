@@ -1523,22 +1523,15 @@ if (action === "notifySMS") {
 
       if (!res.ok) throw new Error(await res.text());
 
-      // Persist UI state
-      APP_STATE.notifyStatus[id] ||= {};
-      APP_STATE.notifyStatus[id] ||= {
-  email: null,
-  sms: [],
-  by: "admin",
-  auto: false
-};
+      // ✅ Persist UI state safely (prevents "unshift" crash)
+      const bucket = ensureNotifyBucket(id, { by: "admin", auto: false });
 
-APP_STATE.notifyStatus[id].sms.unshift({
-  phone: "—",            // real phone comes from worker response later
-  ok: true,
-  status: "queued",
-  ts: new Date().toISOString()
-});
-
+      bucket.sms.unshift({
+        phone: "—",
+        ok: true,
+        status: "queued",
+        ts: new Date().toISOString()
+      });
 
       renderScheduleAdmin(el);
       toast("SMS notification sent.");
@@ -1546,7 +1539,6 @@ APP_STATE.notifyStatus[id].sms.unshift({
   );
   return;
 }
-
     };
   });
   el.querySelectorAll("input[data-time]").forEach(inp => {
@@ -1623,6 +1615,45 @@ el.querySelectorAll("select[data-field='email']").forEach(sel => {
       refreshTimeline();
     };
   });
+}
+/* =========================
+ * Notify Status Normalizer (FIX for SMS unshift undefined)
+ * ========================= */
+function ensureNotifyBucket(entryId, { by = "admin", auto = false } = {}) {
+  const id = String(entryId || "");
+  if (!id) return null;
+
+  if (!APP_STATE.notifyStatus || typeof APP_STATE.notifyStatus !== "object") {
+    APP_STATE.notifyStatus = {};
+  }
+
+  // Create the entry bucket if missing
+  if (!APP_STATE.notifyStatus[id] || typeof APP_STATE.notifyStatus[id] !== "object") {
+    APP_STATE.notifyStatus[id] = {
+      email: null,
+      sms: [],
+      by,
+      auto
+    };
+  }
+
+  // Guarantee sms is always an array
+  if (!Array.isArray(APP_STATE.notifyStatus[id].sms)) {
+    APP_STATE.notifyStatus[id].sms = [];
+  }
+
+  // Guarantee email key exists (can be null)
+  if (!("email" in APP_STATE.notifyStatus[id])) {
+    APP_STATE.notifyStatus[id].email = null;
+  }
+
+  // Update actor flags if provided
+  APP_STATE.notifyStatus[id].by = APP_STATE.notifyStatus[id].by || by;
+  APP_STATE.notifyStatus[id].auto = typeof APP_STATE.notifyStatus[id].auto === "boolean"
+    ? APP_STATE.notifyStatus[id].auto
+    : auto;
+
+  return APP_STATE.notifyStatus[id];
 }
 
 function deepClone(obj) {
