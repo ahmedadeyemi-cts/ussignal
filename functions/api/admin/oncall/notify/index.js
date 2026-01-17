@@ -1,28 +1,30 @@
 export async function onRequestPost(ctx) {
   try {
     const { request, env } = ctx;
-
     const body = await request.json().catch(() => ({}));
-    const { entryId, mode = "both", auto = false, retry = false } = body;
+
+    const {
+      entryId,
+      mode = "both",
+      auto = false
+    } = body;
 
     if (!entryId) {
       return json({ error: "entryId required" }, 400);
     }
 
-    // Load schedule
     const raw = await env.ONCALL_KV.get("ONCALL:SCHEDULE");
     if (!raw) {
       return json({ error: "schedule not found" }, 404);
     }
 
     const schedule = JSON.parse(raw);
-    const entry = (schedule.entries || []).find(e => e.id === entryId);
-
+    const entry = schedule.entries?.find(e => e.id === entryId);
     if (!entry) {
       return json({ error: "entry not found" }, 404);
     }
 
-    // 🚧 TEMP: stub send logic (next phase)
+    // Build recipients (same logic you validated)
     const emails = [];
     const sms = [];
 
@@ -31,19 +33,43 @@ export async function onRequestPost(ctx) {
       if (mode !== "email" && p.phone) sms.push(p.phone);
     });
 
-    // Return what WOULD be sent (safe test)
-    return json({
-      ok: true,
+    // 🔍 Determine audit action
+    let action = "NOTIFY_MANUAL";
+    if (auto) {
+      const day = new Date().getDay();
+      action = day === 5
+        ? "AUTO_NOTIFY_FRIDAY"
+        : day === 1
+          ? "AUTO_NOTIFY_MONDAY"
+          : "AUTO_NOTIFY";
+    }
+
+    // 🧾 Write audit entry
+    const audit = {
+      ts: new Date().toISOString(),
+      action,
+      actor: auto ? "system" : "admin",
       entryId,
       mode,
-      auto,
-      retry,
+      emails,
+      sms
+    };
+
+    await env.ONCALL_KV.put(
+      `AUDIT:${crypto.randomUUID()}`,
+      JSON.stringify(audit)
+    );
+
+    return json({
+      ok: true,
+      action,
+      entryId,
       emails,
       sms
     });
 
   } catch (err) {
-    console.error("notify failed:", err);
+    console.error("notify error:", err);
     return json({ error: err.message }, 500);
   }
 }
