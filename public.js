@@ -29,6 +29,11 @@ let STATE = {
   current: null,
   loading: true
 };
+/* =========================
+ * RENDER / FETCH HASHES
+ * ========================= */
+let LAST_HASH = null;
+let LAST_TIMELINE_HASH = null;
 
 document.addEventListener("DOMContentLoaded", () => {
   wireUI();
@@ -58,9 +63,29 @@ function wireUI() {
 }
 
 async function loadAll() {
+  const before = LAST_HASH;
+
   await Promise.allSettled([loadSchedule(), loadCurrent()]);
+
   STATE.loading = false;
-  renderAll();
+
+  if (before !== LAST_HASH) {
+    renderAll();
+  } else {
+    renderLastUpdated();
+    renderCurrent();
+  }
+}
+function isArchived(entry) {
+  const end = parseLocalISO(entry.endISO);
+  return !isNaN(end) && end < new Date();
+}
+
+function isCurrentWeek(entry) {
+  const now = new Date();
+  const s = parseLocalISO(entry.startISO);
+  const e = parseLocalISO(entry.endISO);
+  return now >= s && now <= e;
 }
 
 /* =========================
@@ -75,10 +100,22 @@ async function loadSchedule() {
   // Normalize (matches your app.js logic style)
   const normalized = normalizeScheduleResponse(raw);
 
-  STATE.entries = normalized.entries || [];
-  STATE.updatedAt = extractUpdatedAt(raw) || new Date().toISOString();
+  const nextEntries = normalized.entries || [];
+  const nextHash = hashEntries(nextEntries);
 
-  console.log("[public] schedule entries:", STATE.entries.length, "updatedAt:", STATE.updatedAt);
+if (LAST_HASH === nextHash) {
+  // No structural change, only update timestamp
+  STATE.updatedAt = extractUpdatedAt(raw) || STATE.updatedAt;
+  console.log("[public] schedule unchanged, skipping re-render");
+  return;
+}
+
+LAST_HASH = nextHash;
+STATE.entries = nextEntries;
+STATE.updatedAt = extractUpdatedAt(raw) || new Date().toISOString();
+
+console.log("[public] schedule changed, entries:", STATE.entries.length);
+
 }
 
 async function loadCurrent() {
@@ -180,6 +217,7 @@ function cryptoIdFallback(e) {
 
 function renderAll() {
   renderLastUpdated();
+  ensureJumpButton();
   renderTimeline();
   renderCurrent();
   renderSchedule();
@@ -217,11 +255,31 @@ function renderLastUpdated() {
     : "Last updated: —";
 }
 
+function ensureJumpButton() {
+  let btn = $("jumpToCurrent");
+  if (btn) return;
+
+  btn = document.createElement("button");
+  btn.id = "jumpToCurrent";
+  btn.className = "ghost jump-btn";
+  btn.textContent = "Jump to Current Week";
+
+  btn.onclick = () => jumpToCurrentWeek();
+
+  const container = document.querySelector(".container");
+  if (container) {
+    const badge = $("lastUpdated");
+    badge ? badge.after(btn) : container.prepend(btn);
+  }
+}
+
 function renderTimeline() {
   const el = $("timeline");
   if (!el) return;
 
   const entries = filteredEntriesSorted();
+  const hash = hashEntries(entries);
+  if (hash === LAST_TIMELINE_HASH) return;
   if (!entries.length) {
     el.innerHTML = `<div class="subtle">No schedule entries found.</div>`;
     return;
@@ -250,10 +308,6 @@ function renderTimeline() {
     `;
 
     el.appendChild(row);
-
-    if (current) {
-      row.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
   });
 }
 
@@ -317,32 +371,64 @@ function renderSchedule() {
   const el = $("schedule");
   if (!el) return;
 
-  const entries = filteredEntriesSorted();
-  if (!entries.length) {
+  const all = filteredEntriesSorted();
+  if (!all.length) {
     el.innerHTML = `<div class="subtle">No schedule available.</div>`;
     return;
   }
 
+  const active = all.filter(e => !isArchived(e));
+  const archived = all.filter(isArchived);
+
   el.innerHTML = "";
 
-  entries.forEach(e => {
+  /* ===== ACTIVE / UPCOMING ===== */
+  active.forEach(e => {
     const current = isCurrentFromEntries(e);
-  const archived = isArchived(e);
-  el.innerHTML += `
-    <div class="schedule-card ${current ? "current-oncall" : ""} ${archived ? "archived" : ""}">
-      <div class="card-head">
-        <div class="card-title">
-          ${escapeHtml(formatDate(e.startISO))} → ${escapeHtml(formatDate(e.endISO))}
-          ${archived ? `<span class="archived-badge">Archived</span>` : ""}
+    const currentWeek = isCurrentWeek(e);
+
+    el.innerHTML += `
+      <div class="schedule-card ${current ? "current-oncall" : ""}"
+           ${currentWeek ? `data-current-week="true"` : ""}>
+        <div class="card-head">
+          <div class="card-title">
+            ${escapeHtml(formatDate(e.startISO))} → ${escapeHtml(formatDate(e.endISO))}
+          </div>
+          <div class="small subtle">Read-only · CST</div>
         </div>
-        <div class="small subtle">Read-only · CST</div>
+        <div class="entry-grid">
+          ${renderEntryDepts(e)}
+        </div>
       </div>
-      <div class="entry-grid">
-      ${renderEntryDepts(e)}
-    </div>
-  </div>
-`;
+    `;
   });
+
+  /* ===== ARCHIVED (COLLAPSIBLE) ===== */
+  if (archived.length) {
+    el.innerHTML += `
+      <details class="archived-wrapper">
+        <summary>
+          Archived Schedules (${archived.length})
+        </summary>
+        <div class="archived-list">
+          ${archived.map(e => `
+            <div class="schedule-card archived">
+              <div class="card-head">
+                <div class="card-title">
+                  ${escapeHtml(formatDate(e.startISO))} → ${escapeHtml(formatDate(e.endISO))}
+                  <span class="archived-badge">Archived</span>
+                </div>
+                <div class="small subtle">Past</div>
+              </div>
+              <div class="entry-grid">
+                ${renderEntryDepts(e)}
+              </div>
+            </div>
+          `).join("")}
+        </div>
+      </details>
+    `;
+  }
 }
 
 function renderEntryDepts(entry) {
@@ -370,7 +456,20 @@ function renderEntryDepts(entry) {
     `;
   }).join("");
 }
-
+function hashEntries(entries) {
+  try {
+    return JSON.stringify(
+      entries.map(e => ({
+        id: e.id,
+        start: e.startISO,
+        end: e.endISO,
+        d: Object.keys(e.departments || {})
+      }))
+    );
+  } catch {
+    return String(Math.random());
+  }
+}
 /* =========================
  * Filtering / Sorting
  * ========================= */
@@ -440,11 +539,6 @@ function isCurrentFromEntries(entry) {
   const e = parseLocalISO(entry.endISO);
   return now >= s && now < e;
 }
-function isArchived(entry) {
-  const now = new Date();
-  const end = parseLocalISO(entry.endISO);
-  return end < now;
-}
 
 function prettyDept(dep) {
   return DEPT_LABELS[dep] || String(dep || "").replace(/_/g, " ");
@@ -452,6 +546,23 @@ function prettyDept(dep) {
 
 function sanitizePhone(p) {
   return String(p || "").replace(/[^\d+]/g, "");
+}
+function jumpToCurrentWeek() {
+  const target =
+    document.querySelector('[data-current-week="true"]') ||
+    document.querySelector(".current-week");
+
+  if (!target) {
+    console.warn("[public] No current week to jump to");
+    return;
+  }
+
+  target.scrollIntoView({
+    behavior: "smooth",
+    block: "center"
+  });
+
+  target.classList.add("today-indicator");
 }
 
 function escapeHtml(s) {
