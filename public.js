@@ -267,13 +267,27 @@ function renderTimelineBlocks(entry) {
 
   return keys.map(dep => {
     const p = depts[dep] || {};
+    const name = p.name || "—";
+    const email = p.email || "";
     const phone = (p.phone || "").trim();
     const tel = phone ? sanitizePhone(phone) : "";
 
     return `
-      <div class="timeline-block" title="${escapeHtml(prettyDept(dep))} — ${escapeHtml(p.name||"")} — ${escapeHtml(phone)}">
-        <div class="timeline-block-title">${escapeHtml(prettyDept(dep))}</div>
-        <div class="timeline-block-name">${escapeHtml(p.name || "")}</div>
+      <div class="timeline-block">
+        <div class="timeline-block-title">
+          ${escapeHtml(prettyDept(dep))}
+        </div>
+
+        <div class="timeline-block-name">
+          ${escapeHtml(name)}
+        </div>
+
+        ${
+          email
+            ? `<div class="small">${escapeHtml(email)}</div>`
+            : `<div class="small subtle">—</div>`
+        }
+
         ${
           phone
             ? `<a class="small tel-link" href="tel:${escapeHtml(tel)}">${escapeHtml(phone)}</a>`
@@ -326,19 +340,21 @@ function renderSchedule() {
 
   entries.forEach(e => {
     const current = isCurrentFromEntries(e);
-    el.innerHTML += `
-      <div class="schedule-card ${current ? "current-oncall" : ""}">
-        <div class="card-head">
-          <div class="card-title">
-            ${escapeHtml(formatDate(e.startISO))} → ${escapeHtml(formatDate(e.endISO))}
-          </div>
-          <div class="small subtle">Read-only · CST</div>
+  const archived = isArchived(e);
+  el.innerHTML += `
+    <div class="schedule-card ${current ? "current-oncall" : ""} ${archived ? "archived" : ""}">
+      <div class="card-head">
+        <div class="card-title">
+          ${escapeHtml(formatDate(e.startISO))} → ${escapeHtml(formatDate(e.endISO))}
+          ${archived ? `<span class="archived-badge">Archived</span>` : ""}
         </div>
-        <div class="entry-grid">
-          ${renderEntryDepts(e)}
-        </div>
+        <div class="small subtle">Read-only · CST</div>
       </div>
-    `;
+      <div class="entry-grid">
+      ${renderEntryDepts(e)}
+    </div>
+  </div>
+`;
   });
 }
 
@@ -375,10 +391,20 @@ function renderEntryDepts(entry) {
 function filteredEntriesSorted() {
   let list = Array.isArray(STATE.entries) ? [...STATE.entries] : [];
 
-  // sort by start
-  list.sort((a, b) => parseLocalISO(a.startISO) - parseLocalISO(b.startISO));
+  list.sort((a, b) => {
+    const aArchived = isArchived(a);
+    const bArchived = isArchived(b);
 
-  // dept filter
+    // Active first, archived last
+    if (aArchived !== bArchived) {
+      return aArchived ? 1 : -1;
+    }
+
+    // Then by start date
+    return parseLocalISO(a.startISO) - parseLocalISO(b.startISO);
+  });
+
+  // department filter
   if (STATE.dept !== "all") {
     list = list.map(e => ({
       ...e,
@@ -426,6 +452,11 @@ function isCurrentFromEntries(entry) {
   const s = parseLocalISO(entry.startISO);
   const e = parseLocalISO(entry.endISO);
   return now >= s && now < e;
+}
+function isArchived(entry) {
+  const now = new Date();
+  const end = parseLocalISO(entry.endISO);
+  return end < now;
 }
 
 function prettyDept(dep) {
