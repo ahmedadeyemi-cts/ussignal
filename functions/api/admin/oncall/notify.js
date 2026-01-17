@@ -177,7 +177,10 @@ export async function onRequest({ request, env }) {
       });
     }
 
-    if (!targets.length) return json({ error: "No active on-call entries" }, 400);
+    // if (!targets.length) return json({ error: "No active on-call entries" }, 400);
+      if (!targets.length && !entryId) {
+  return json({ error: "No active on-call entries" }, 400);
+}
 
     // -------------------------------
     // Prevent notify on past entries
