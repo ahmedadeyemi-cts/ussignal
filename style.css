@@ -779,3 +779,33 @@ body {
   color: #374151;
   font-weight: 600;
 }
+/* =========================
+ * Schedule Divider
+ * ========================= */
+.schedule-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 28px 0 18px;
+  color: #6b7280; /* slate-500 */
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.schedule-divider::before,
+.schedule-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    transparent,
+    rgba(148, 163, 184, 0.6),
+    transparent
+  );
+}
+
+.schedule-divider span {
+  white-space: nowrap;
+}
