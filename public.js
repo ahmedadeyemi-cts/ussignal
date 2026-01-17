@@ -3,7 +3,7 @@
 // - Handles KV/string wrappers and multiple payload shapes
 // - Renders Timeline / Current / Full Schedule
 // - Today highlight, click-to-call, skeleton loaders, last updated
-// - Auto-refresh
+// - Auto-refresh(s)
 // ======================================================
 
 "use strict";
