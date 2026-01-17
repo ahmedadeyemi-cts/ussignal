@@ -5,7 +5,7 @@ export async function onRequestPost(ctx) {
 
     const {
       entryId,
-      mode = "both",     // email | both
+      mode = "both",     // email | sms | both
       auto = false
     } = body;
 
@@ -26,29 +26,48 @@ export async function onRequestPost(ctx) {
     /* =============================
      * Build recipients
      * ============================= */
-    const to = [];
+    const emailRecipients = [];
+    const smsRecipients = [];
+
     Object.values(entry.departments || {}).forEach(p => {
       if (p?.email) {
-        to.push({
+        emailRecipients.push({
           email: p.email,
+          name: p.name || "On-Call Engineer"
+        });
+      }
+      if (p?.phone) {
+        smsRecipients.push({
+          phone: p.phone,
           name: p.name || "On-Call Engineer"
         });
       }
     });
 
-    if (!to.length) {
+    if (
+      (mode === "email" || mode === "both") &&
+      !emailRecipients.length
+    ) {
       return json({ error: "no email recipients" }, 400);
     }
 
+    if (
+      (mode === "sms" || mode === "both") &&
+      !smsRecipients.length
+    ) {
+      return json({ error: "no sms recipients" }, 400);
+    }
+
     /* =============================
-     * Email content
+     * Email + SMS content
      * ============================= */
     const start = new Date(entry.startISO);
     const end = new Date(entry.endISO);
 
+    const tz = schedule.tz || "America/Chicago";
     const fmt = d =>
       d.toLocaleString("en-US", {
-        timeZone: schedule.tz || "America/Chicago",
+        timeZone: tz,
         weekday: "long",
         month: "short",
         day: "2-digit",
@@ -66,8 +85,10 @@ export async function onRequestPost(ctx) {
         <h2>US Signal On-Call Notice</h2>
         <p>You are scheduled for on-call support.</p>
 
-        <p><strong>Start:</strong> ${fmt(start)}<br/>
-           <strong>End:</strong> ${fmt(end)}</p>
+        <p>
+          <strong>Start:</strong> ${fmt(start)}<br/>
+          <strong>End:</strong> ${fmt(end)}
+        </p>
 
         <p>
           View the full schedule:<br/>
@@ -81,24 +102,40 @@ export async function onRequestPost(ctx) {
       </div>
     `;
 
+    const smsMessage =
+      `US Signal On-Call: Your on-call duty starts ${fmt(start)} and ends ${fmt(end)}.`;
+
     /* =============================
-     * Send email (Brevo)
+     * Send Email (FIRST)
      * ============================= */
     if (mode === "email" || mode === "both") {
-      await sendBrevo(env, {
-        to,
+      await sendBrevoEmail(env, {
+        to: emailRecipients,
         subject,
         html
       });
     }
 
     /* =============================
+     * Send SMS (SECOND)
+     * ============================= */
+    if (mode === "sms" || mode === "both") {
+      for (const r of smsRecipients) {
+        await sendBrevoSMS(env, {
+          to: r.phone,
+          message: smsMessage
+        });
+      }
+    }
+
+    /* =============================
      * Audit entry
      * ============================= */
+    const day = new Date().getDay();
     const action = auto
-      ? (new Date().getDay() === 5
+      ? (day === 5
           ? "AUTO_NOTIFY_FRIDAY"
-          : new Date().getDay() === 1
+          : day === 1
             ? "AUTO_NOTIFY_MONDAY"
             : "AUTO_NOTIFY")
       : "NOTIFY_MANUAL";
@@ -108,7 +145,9 @@ export async function onRequestPost(ctx) {
       action,
       actor: auto ? "system" : "admin",
       entryId,
-      emails: to.map(r => r.email)
+      mode,
+      emails: emailRecipients.map(r => r.email),
+      phones: smsRecipients.map(r => r.phone)
     };
 
     await env.ONCALL_KV.put(
@@ -118,20 +157,21 @@ export async function onRequestPost(ctx) {
 
     return json({
       ok: true,
-      emailsSent: to.length,
-      action
+      action,
+      emailsSent: emailRecipients.length,
+      smsSent: smsRecipients.length
     });
 
   } catch (err) {
-    console.error("notify error:", err);
+    console.error("NOTIFY ERROR:", err);
     return json({ error: err.message }, 500);
   }
 }
 
 /* =============================
- * Brevo helper
+ * Brevo Email helper
  * ============================= */
-async function sendBrevo(env, { to, subject, html }) {
+async function sendBrevoEmail(env, { to, subject, html }) {
   const res = await fetch("https://api.brevo.com/v3/smtp/email", {
     method: "POST",
     headers: {
@@ -149,14 +189,18 @@ async function sendBrevo(env, { to, subject, html }) {
     })
   });
 
-const text = await res.text();
-console.log("BREVO RESPONSE STATUS:", res.status);
-console.log("BREVO RESPONSE BODY:", text);
+  const text = await res.text();
+  console.log("BREVO EMAIL STATUS:", res.status);
+  console.log("BREVO EMAIL BODY:", text);
 
-if (!res.ok) {
-  throw new Error(`Brevo error ${res.status}: ${text}`);
+  if (!res.ok) {
+    throw new Error(`Brevo email error ${res.status}: ${text}`);
+  }
 }
-}
+
+/* =============================
+ * Brevo SMS helper
+ * ============================= */
 async function sendBrevoSMS(env, { to, message }) {
   const res = await fetch("https://api.brevo.com/v3/transactionalSMS/send", {
     method: "POST",
@@ -177,12 +221,13 @@ async function sendBrevoSMS(env, { to, message }) {
   console.log("BREVO SMS BODY:", text);
 
   if (!res.ok) {
-    throw new Error(`SMS failed ${res.status}: ${text}`);
+    throw new Error(`Brevo SMS error ${res.status}: ${text}`);
   }
-
-  return true;
 }
 
+/* =============================
+ * JSON helper
+ * ============================= */
 function json(obj, status = 200) {
   return new Response(JSON.stringify(obj), {
     status,
