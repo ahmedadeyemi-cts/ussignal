@@ -267,27 +267,18 @@ function renderTimelineBlocks(entry) {
 
   return keys.map(dep => {
     const p = depts[dep] || {};
-    const name = p.name || "—";
-    const email = p.email || "";
     const phone = (p.phone || "").trim();
     const tel = phone ? sanitizePhone(phone) : "";
 
     return `
       <div class="timeline-block">
         <div class="timeline-dept">${escapeHtml(prettyDept(dep))}</div>
-
-        <div class="timeline-name">${escapeHtml(name)}</div>
-
-        ${
-          email
-            ? `<div class="timeline-email">${escapeHtml(email)}</div>`
-            : ""
-        }
-
+        <div class="timeline-name">${escapeHtml(p.name || "—")}</div>
+        <div class="timeline-email">${escapeHtml(p.email || "—")}</div>
         ${
           phone
             ? `<a class="timeline-phone" href="tel:${escapeHtml(tel)}">${escapeHtml(phone)}</a>`
-            : ""
+            : `<div class="timeline-phone subtle">—</div>`
         }
       </div>
     `;
