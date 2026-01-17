@@ -153,6 +153,10 @@ async function sendBrevo(env, { to, subject, html }) {
     const text = await res.text();
     throw new Error(`Brevo error ${res.status}: ${text}`);
   }
+  if (!res.ok) {
+  const text = await res.text();
+  throw new Error(`Brevo error ${res.status}: ${text}`);
+}
 }
 
 function json(obj, status = 200) {
