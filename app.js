@@ -240,6 +240,9 @@ async function openNotifyTimeline(entryId) {
     ""
   );
 }
+/* =========================
+ * CRON HEALTH OUTPUT
+ * ========================= */
 async function loadCronHealth() {
   try {
     const res = await fetch("/api/admin/oncall/cron-health");
@@ -263,6 +266,27 @@ async function loadCronHealth() {
 
 loadCronHealth();
 setInterval(loadCronHealth, 60_000);
+/* =========================
+ * CRON HEALTH STATUS
+ * ========================= */
+async function loadCronHealth() {
+  try {
+    const res = await fetch("/api/admin/oncall/cron-health");
+    const data = await res.json();
+
+    const el = document.getElementById("cronHealthStatus");
+    if (!el) return;
+
+    el.textContent = JSON.stringify(data, null, 2);
+  } catch (e) {
+    const el = document.getElementById("cronHealthStatus");
+    if (el) el.textContent = "Failed to load cron health";
+  }
+}
+document.addEventListener("DOMContentLoaded", () => {
+  loadCronHealth();
+});
+
 /* =========================
  * Init
  * ========================= */
