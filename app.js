@@ -1314,6 +1314,19 @@ function renderScheduleAdmin(el) {
     DEPT_KEYS.map(dep => [dep, { name: "", email: "", phone: "" }])
   )
 }));
+// ===============================
+// SPLIT ACTIVE vs ARCHIVED ENTRIES
+// ===============================
+const activeEntries = [];
+const archivedEntries = [];
+
+allEntries.forEach(e => {
+  if (isPastOnCall(e)) {
+    archivedEntries.push(e);
+  } else {
+    activeEntries.push(e);
+  }
+});
 
 // ===============================
 // ACTIVE / CURRENT SCHEDULES
@@ -1447,6 +1460,16 @@ activeEntries.forEach(e => {
     </div>
   `;
 });
+// ===============================
+// VISUAL DIVIDER — ACTIVE → ARCHIVED
+// ===============================
+if (archivedEntries.length && activeEntries.length) {
+  el.innerHTML += `
+    <div class="schedule-divider">
+      <span>Archived Schedules</span>
+    </div>
+  `;
+}
 
 // ===============================
 // ARCHIVED (COLLAPSIBLE — PERSISTED)
