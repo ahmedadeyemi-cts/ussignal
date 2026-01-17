@@ -774,3 +774,6 @@ function formatCst(d, tz) {
 function notifyStateKey(CFG, entryId, channel, notifyType) {
   return `${CFG.kv.notifyStatePrefix}${String(entryId)}:${channel}:${notifyType}`;
 }
+// Explicit method bindings for Cloudflare Pages
+export const onRequestPost = onRequest;
+export const onRequestGet = onRequest;
