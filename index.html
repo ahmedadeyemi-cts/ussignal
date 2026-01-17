@@ -323,8 +323,23 @@
   });
 
   /* ===== TIMELINE OBSERVER + WEEK SWIPE ===== */
-  const timeline = document.getElementById("timeline");
-  if (!timeline) return;
+const targets = [
+  document.getElementById("timeline"),
+  document.getElementById("schedule")
+].filter(Boolean);
+
+targets.forEach(container => {
+  const obs = new MutationObserver(() => {
+    const current =
+      container.querySelector(".current-oncall") ||
+      container.querySelector("[data-current-week='true']");
+    if (current) {
+      current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  });
+  obs.observe(container, { childList: true, subtree: true });
+});
+
 
   const obs = new MutationObserver(() => {
     Array.from(timeline.children).forEach((r,i)=>{
