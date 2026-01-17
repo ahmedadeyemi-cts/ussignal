@@ -1862,27 +1862,41 @@ async function exportICS() {
 }
 
 async function sendNotify() {
+  const entries = APP_STATE.scheduleFull?.entries || [];
+  const now = new Date();
+
+  // Find active entry explicitly
+  const active = entries.find(e => {
+    const s = isoToDateLocalAssumed(e.startISO);
+    const en = isoToDateLocalAssumed(e.endISO);
+    return now >= s && now < en;
+  });
+
+  if (!active) {
+    toast("No active on-call entry to notify.");
+    return;
+  }
+
   const res = await fetchAuth(`/api/admin/oncall/notify`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ mode: "both" })
+    body: JSON.stringify({
+      mode: "both",
+      entryId: active.id
+    })
   });
+
   if (!res.ok) throw new Error(await res.text());
 
-  // ✅ update UI state immediately
-  const now = new Date().toISOString();
-  (APP_STATE.scheduleFull?.entries || []).forEach(e => {
-    APP_STATE.notifyStatus[e.id] = {
-      email: { sentAt: now },
-      sms: [],          // keep as array for compatibility
-      by: "admin"
-    };
-  });
+  APP_STATE.notifyStatus[active.id] = {
+    email: { sentAt: new Date().toISOString() },
+    sms: [],
+    by: "admin"
+  };
 
   renderScheduleAdmin(byId("schedule"));
   toast("Notifications sent.");
 }
-
 
 
 async function revertSchedule() {
