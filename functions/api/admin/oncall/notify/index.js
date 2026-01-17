@@ -157,6 +157,31 @@ if (!res.ok) {
   throw new Error(`Brevo error ${res.status}: ${text}`);
 }
 }
+async function sendBrevoSMS(env, { to, message }) {
+  const res = await fetch("https://api.brevo.com/v3/transactionalSMS/send", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "api-key": env.BREVO_API_KEY
+    },
+    body: JSON.stringify({
+      sender: env.SMS_SENDER_ID || "USSignal",
+      recipient: to,
+      content: message,
+      type: "transactional"
+    })
+  });
+
+  const text = await res.text();
+  console.log("BREVO SMS STATUS:", res.status);
+  console.log("BREVO SMS BODY:", text);
+
+  if (!res.ok) {
+    throw new Error(`SMS failed ${res.status}: ${text}`);
+  }
+
+  return true;
+}
 
 function json(obj, status = 200) {
   return new Response(JSON.stringify(obj), {
