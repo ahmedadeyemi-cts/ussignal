@@ -227,16 +227,16 @@
 </header>
 
 <nav class="tabs" role="tablist">
-  <button class="tab active" data-tab="timelineTab" role="tab">Timeline</button>
-  <button class="tab" data-tab="currentTab" role="tab">Who’s On Call Now</button>
   <button class="tab" data-tab="scheduleTab" role="tab">Full Schedule</button>
+  <button class="tab" data-tab="currentTab" role="tab">Who’s On Call Now</button>
+  <button class="tab active" data-tab="timelineTab" role="tab">Timeline</button>
 </nav>
 
 <main class="container">
 
-  <section id="timelineTab" class="panel active" role="tabpanel">
-    <h2>Weekly Timeline</h2>
-    <div id="timeline"></div>
+  <section id="scheduleTab" class="panel" role="tabpanel">
+    <h2>Full Schedule</h2>
+    <div id="schedule"></div>
   </section>
 
   <section id="currentTab" class="panel" role="tabpanel">
@@ -247,9 +247,9 @@
     <div id="currentOnCall" class="live-card"></div>
   </section>
 
-  <section id="scheduleTab" class="panel" role="tabpanel">
-    <h2>Full Schedule</h2>
-    <div id="schedule"></div>
+    <section id="timelineTab" class="panel active" role="tabpanel">
+    <h2>Weekly Timeline</h2>
+    <div id="timeline"></div>
   </section>
 
 </main>
