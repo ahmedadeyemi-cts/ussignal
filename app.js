@@ -269,7 +269,7 @@ setInterval(loadCronHealth, 60_000);
 /* =========================
  * CRON HEALTH STATUS
  * ========================= */
-async function loadCronHealth() {
+async function loadCronHealthstatus() {
   try {
     const res = await fetch("/api/admin/oncall/cron-health");
     const data = await res.json();
@@ -2508,7 +2508,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 document.addEventListener("DOMContentLoaded", () => {
-  loadCronHealth();
+  loadCronHealthstatus();
 });
 
 
