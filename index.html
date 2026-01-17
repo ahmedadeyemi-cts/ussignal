@@ -278,8 +278,9 @@
     const active = tabs.findIndex(t => t.classList.contains("active"));
     if (e.key === "ArrowRight" && tabs[active+1]) activate(tabs[active+1].dataset.tab);
     if (e.key === "ArrowLeft" && tabs[active-1]) activate(tabs[active-1].dataset.tab);
-    if (e.key === "Home") activate("timelineTab");
-    if (e.key === "End") activate("scheduleTab");
+    if (e.key === "Home") activate("scheduleTab");
+    if (e.key === "End") activate("timelineTab");
+
   });
 
   /* ===== VELOCITY SWIPE (TABS) ===== */
