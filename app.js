@@ -283,9 +283,6 @@ async function loadCronHealth() {
     if (el) el.textContent = "Failed to load cron health";
   }
 }
-document.addEventListener("DOMContentLoaded", () => {
-  loadCronHealth();
-});
 
 /* =========================
  * Init
@@ -2509,6 +2506,9 @@ document.addEventListener("DOMContentLoaded", () => {
   initApp(window.__APP_CTX__ || {}).catch(err => {
     console.error("App init failed:", err);
   });
+});
+document.addEventListener("DOMContentLoaded", () => {
+  loadCronHealth();
 });
 
 
