@@ -16,6 +16,7 @@
 
 "use strict";
 const THEME_KEY = "oncall-theme";
+const ARCHIVE_STATE_KEY = "oncall-archive-open";
 
 /* =========================
  * Global App State
@@ -1307,130 +1308,194 @@ function renderScheduleAdmin(el) {
   const deptFilter = String(APP_STATE.dept || "all").toLowerCase();
   const restrictToAllowedDepts = roleAtLeast(APP_STATE.role, "admin") ? false : true;
 
- const entries = (APP_STATE.draftSchedule?.entries || []).map(e => ({
+ const allEntries = (APP_STATE.draftSchedule?.entries || []).map(e => ({
   ...e,
   departments: e.departments || Object.fromEntries(
     DEPT_KEYS.map(dep => [dep, { name: "", email: "", phone: "" }])
   )
 }));
 
+// ===============================
+// ACTIVE / CURRENT SCHEDULES
+// ===============================
+activeEntries.forEach(e => {
+  const editing =
+    APP_STATE.editingEntryIds.has(String(e.id));
 
-  entries.forEach(e => {
-    const isPast = isPastOnCall(e);
-    const editing =
-    !isPast && APP_STATE.editingEntryIds.has(String(e.id));
+  const startDisplay = formatCSTFromChicagoLocal(e.startISO);
+  const endDisplay = formatCSTFromChicagoLocal(e.endISO);
 
-    const startDisplay = formatCSTFromChicagoLocal(e.startISO);
-    const endDisplay = formatCSTFromChicagoLocal(e.endISO);
+  const startInput = (e.startISO || "").slice(0, 16);
+  const endInput = (e.endISO || "").slice(0, 16);
 
-    const startInput = (e.startISO || "").slice(0, 16);
-    const endInput = (e.endISO || "").slice(0, 16);
+  el.innerHTML += `
+    <div class="schedule-card
+      ${e._autoResolved ? "resolved" : ""}
+      ${isCurrentOnCall(e) ? "current-oncall" : ""}">
 
-    el.innerHTML += `
-     <div class="schedule-card
- ${e._autoResolved ? "resolved" : ""}
- ${isCurrentOnCall(e) ? "current-oncall" : ""}
- ${isPastOnCall(e) ? "past-week" : ""}">
+      <div class="card-head">
+        <div>
+          ${
+            editing && canEdit
+              ? `
+                <div class="inline-row">
+                  <label>Start (Fri only)</label>
+                  <input type="datetime-local"
+                         data-time="start"
+                         data-id="${escapeHtml(String(e.id))}"
+                         value="${escapeHtml(startInput)}"
+                         step="60" />
+                </div>
 
-        <div class="card-head">
-          <div>
-            ${
-              editing && canEdit
-                ? `
-                  <div class="inline-row">
-                    <label>Start (Fri only)</label>
-                    <input type="datetime-local"
-                           data-time="start"
-                           data-id="${escapeHtml(String(e.id))}"
-                           value="${escapeHtml(startInput)}"
-                           step="60" />
-                  </div>
-                  <div class="inline-row">
-                    <label>End (Auto-aligned to Fri 7:00 AM)</label>
-                    <input type="datetime-local"
-                           data-time="end"
-                           data-id="${escapeHtml(String(e.id))}"
-                           value="${escapeHtml(endInput)}"
-                           step="60" />
-                  </div>
-                  <div class="small subtle">CST · Fri 4:00 PM → Fri 7:00 AM</div>
-                `
-                : `
-                 <div class="card-title">
-  ${escapeHtml(startDisplay)} → ${escapeHtml(endDisplay)}
-  ${
-    (() => {
-      const h = getHolidayName(isoToDateLocalAssumed(e.startISO));
-      return h
-        ? `<span class="holiday-badge">${escapeHtml(h)}</span>`
-        : "";
-    })()
+                <div class="inline-row">
+                  <label>End (Auto-aligned to Fri 7:00 AM)</label>
+                  <input type="datetime-local"
+                         data-time="end"
+                         data-id="${escapeHtml(String(e.id))}"
+                         value="${escapeHtml(endInput)}"
+                         step="60" />
+                </div>
+
+                <div class="small subtle">
+                  CST · Fri 4:00 PM → Fri 7:00 AM
+                </div>
+              `
+              : `
+                <div class="card-title">
+                  ${escapeHtml(startDisplay)} → ${escapeHtml(endDisplay)}
+                  ${
+                    (() => {
+                      const h = getHolidayName(isoToDateLocalAssumed(e.startISO));
+                      return h
+                        ? `<span class="holiday-badge">${escapeHtml(h)}</span>`
+                        : "";
+                    })()
+                  }
+                </div>
+
+                ${
+                  (() => {
+                    const n = APP_STATE.notifyStatus[e.id];
+                    if (!n) return `<span class="notify-badge pending">⏳ Pending</span>`;
+
+                    return `
+                      <div class="notify-badges">
+                        ${n.email ? `<span class="notify-badge email">📧 Email</span>` : ""}
+                        ${n.sms?.some(s => s.ok)
+                          ? `<span class="notify-badge sms">📱 SMS</span>`
+                          : ""}
+                        ${n.sms?.some(s => !s.ok)
+                          ? `<span class="notify-badge error">⚠ SMS Failed</span>`
+                          : ""}
+                        <button class="ghost small"
+                          data-action="notifyTimeline"
+                          data-id="${escapeHtml(String(e.id))}">
+                          🕒 Timeline
+                        </button>
+                      </div>
+                    `;
+                  })()
+                }
+
+                <div class="small subtle">CST</div>
+              `
+          }
+          <div class="small">Entry ID: ${escapeHtml(String(e.id))}</div>
+        </div>
+
+        <div class="card-actions">
+          ${
+            isAdmin
+              ? `
+                <button class="ghost"
+                  data-action="notifyEntry"
+                  data-id="${escapeHtml(String(e.id))}">
+                  Notify (Email + SMS)
+                </button>
+
+                <button class="ghost"
+                  data-action="notifySMS"
+                  data-id="${escapeHtml(String(e.id))}">
+                  Send SMS Only
+                </button>
+              `
+              : ""
+          }
+
+          ${
+            canEdit
+              ? `
+                <button class="primary"
+                  data-action="${editing ? "done" : "edit"}"
+                  data-id="${escapeHtml(String(e.id))}">
+                  ${editing ? "Done" : "Edit"}
+                </button>
+              `
+              : ""
+          }
+        </div>
+      </div>
+
+      <div class="entry-grid">
+        ${renderDeptBlocks(
+          e.departments,
+          editing && canEdit,
+          e.id,
+          restrictToAllowedDepts
+        )}
+      </div>
+    </div>
+  `;
+});
+
+// ===============================
+// ARCHIVED (COLLAPSIBLE — PERSISTED)
+// ===============================
+if (archivedEntries.length) {
+  const isOpen = localStorage.getItem(ARCHIVE_STATE_KEY) === "true";
+
+  el.innerHTML += `
+    <details class="archived-wrapper" ${isOpen ? "open" : ""}>
+      <summary id="archivedSummary">
+        Archived Schedules (${archivedEntries.length})
+      </summary>
+
+      <div class="archived-list">
+        ${archivedEntries.map(e => {
+          const startDisplay = formatCSTFromChicagoLocal(e.startISO);
+          const endDisplay = formatCSTFromChicagoLocal(e.endISO);
+
+          return `
+            <div class="schedule-card past-week archived">
+              <div class="card-head">
+                <div class="card-title">
+                  ${escapeHtml(startDisplay)} → ${escapeHtml(endDisplay)}
+                  <span class="archived-badge">Archived</span>
+                </div>
+                <div class="small subtle">Read-only · CST</div>
+                <div class="small">
+                  Entry ID: ${escapeHtml(String(e.id))}
+                </div>
+              </div>
+
+              <div class="entry-grid">
+                ${renderDeptBlocks(e.departments, false, e.id, false)}
+              </div>
+            </div>
+          `;
+        }).join("")}
+      </div>
+    </details>
+  `;
+
+  // Persist open/close state
+  const details = el.querySelector(".archived-wrapper");
+  if (details) {
+    details.addEventListener("toggle", () => {
+      localStorage.setItem(ARCHIVE_STATE_KEY, details.open ? "true" : "false");
+    });
   }
-</div>
-${
-  (() => {
-    const n = APP_STATE.notifyStatus[e.id];
-    if (!n) return `<span class="notify-badge pending">⏳ Pending</span>`;
-
-    return `
-      <div class="notify-badges">
-        ${n.email ? `<span class="notify-badge email">📧 Email</span>` : ""}
-        ${n.sms?.some(s => s.ok)
-  ? `<span class="notify-badge sms">📱 SMS</span>`
-  : ""}
-${n.sms?.some(s => !s.ok)
-  ? `<span class="notify-badge error">⚠ SMS Failed</span>`
-  : ""}
-        <button class="ghost small"
-          data-action="notifyTimeline"
-          data-id="${escapeHtml(String(e.id))}">
-          🕒 Timeline
-        </button>
-      </div>
-    `;
-  })()
 }
-
-                  <div class="small subtle">CST</div>
-                `
-            }
-            <div class="small">Entry ID: ${escapeHtml(String(e.id))}</div>
-          </div>
-
-         <div class="card-actions">
-  ${isAdmin && !isPastOnCall(e)
-    ? `
-      <button class="ghost"
-        data-action="notifyEntry"
-        data-id="${escapeHtml(String(e.id))}">
-        Notify (Email + SMS)
-      </button>
-
-      <button class="ghost"
-        data-action="notifySMS"
-        data-id="${escapeHtml(String(e.id))}">
-        Send SMS Only
-      </button>
-    `
-    : ""}
-
-
-          ${canEdit && !isPast
-  ? `<button class="primary" data-action="${editing ? "done" : "edit"}" data-id="${escapeHtml(String(e.id))}">
-       ${editing ? "Done" : "Edit"}
-     </button>`
-  : isPast
-    ? `<span class="small subtle">Locked</span>`
-    : ""}
-          </div>
-        </div>
-
-        <div class="entry-grid">
-          ${renderDeptBlocks(e.departments, editing && canEdit, e.id, restrictToAllowedDepts)}
-        </div>
-      </div>
-    `;
-  });
   el.querySelectorAll("button[data-action]").forEach(btn => {
     btn.onclick = async () => {
       const action = btn.getAttribute("data-action");
