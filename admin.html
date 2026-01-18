@@ -224,8 +224,7 @@
       <label>Seed</label><input type="number" id="autogenSeed" value="0" />
       <button id="runAutogenBtn" class="primary">Run</button>
     </div>
-  </section>
-<!-- PS CUSTOMERS -->
+      <!-- PS Customers -->
 <section id="psCustomersTab" class="panel">
   <div class="panel-head">
     <h2>Professional Services Customers</h2>
@@ -238,27 +237,18 @@
   </div>
 
   <div class="small subtle" style="margin-bottom:10px">
-    PINs must be <b>exactly 5 digits</b>. SMS authentication and IVR validation
-    rely on these values.
+    PINs must be <b>exactly 5 digits</b>. SMS authentication and IVR validation rely on these values.
   </div>
 
-  <table class="data-table">
-    <thead>
-      <tr>
-        <th style="width:55%">Customer Name</th>
-        <th style="width:25%">PIN</th>
-        <th style="width:20%"></th>
-      </tr>
-    </thead>
-    <tbody id="psCustomersTableBody">
-      <!-- rows injected by app.js -->
-    </tbody>
-  </table>
+  <!-- ✅ APP.JS RENDERS HERE -->
+  <div id="psCustomers"></div>
 
   <div class="small subtle" style="margin-top:12px">
     Changes are not active until <b>Save</b> is clicked.
   </div>
 </section>
+
+  
   <!-- AUDIT -->
   <section id="auditTab" class="panel">
     <div class="panel-head">
