@@ -1808,8 +1808,23 @@ async function loadPsCustomers() {
     return;
   }
 
-  const data = await res.json();
-  APP_STATE.psCustomers = Array.isArray(data.customers) ? data.customers : [];
+  const raw = await res.json();
+
+// 🔑 unwrap KV + Pages Functions responses
+let data =
+  raw?.customers
+    ? raw
+    : raw?.value
+    ? (typeof raw.value === "string" ? JSON.parse(raw.value) : raw.value)
+    : (typeof raw === "string" ? JSON.parse(raw) : raw);
+
+// 🔑 final safety
+APP_STATE.psCustomers = Array.isArray(data?.customers)
+  ? data.customers
+  : [];
+
+renderPsCustomers();
+
 
   renderPsCustomers();
 }
