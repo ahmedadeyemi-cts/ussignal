@@ -45,6 +45,7 @@ let APP_STATE = {
 
   // roster state
   roster: null,
+  psCustomers: [],
 
   // timeline state
   timelineMode: "weeks"
@@ -353,6 +354,15 @@ if (!APP_STATE.publicMode) {
   onClick("rosterDownloadBtn", downloadRosterCSV);
   onClick("scheduleDownloadBtn", downloadScheduleCSV);
 }
+    // ✅ PS Customers wiring
+  onClick("psAddCustomerBtn", psAddCustomerModal);
+  onClick("psSaveCustomersBtn", () => confirmModal(
+    "Save PS Customers",
+    "Save PS customer PIN changes?",
+    savePsCustomers
+  ));
+  onClick("psReloadCustomersBtn", loadPsCustomers);
+
 
     // =========================
   // FINALIZE UI FIRST (SAFE)
@@ -660,6 +670,8 @@ function wireTabs() {
       if (target === "auditTab") loadAudit().catch(() => {});
       if (target === "timelineTab") refreshTimeline();
       if (target === "historyTab") loadHistory().catch(() => {});
+      if (target === "psCustomersTab") loadPsCustomers().catch(() => {});
+
 
     };
   });
