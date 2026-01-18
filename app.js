@@ -1391,44 +1391,27 @@ activeEntries.forEach(e => {
 
                 ${
                   (() => {
-                    const n = APP_STATE.notifyStatus[e.id] || {};
-const hasEmail = !!n.email;
-const hasSMS = Array.isArray(n.sms) && n.sms.length > 0;
+  const n = APP_STATE.notifyStatus[e.id] || {};
+  const hasEmail = !!n.email;
+  const hasSMS = Array.isArray(n.sms) && n.sms.length > 0;
 
-if (!hasEmail && !hasSMS) {
-  return `<span class="notify-badge pending">⏳ Pending</span>`;
-}
+  if (!hasEmail && !hasSMS) {
+    return `<span class="notify-badge pending">⏳ Pending</span>`;
+  }
 
-return `
-  <div class="notify-badges">
-    ${hasEmail ? `<span class="notify-badge email">📧 Email</span>` : ""}
-    ${hasSMS ? `<span class="notify-badge sms">📱 SMS</span>` : ""}
-    ${hasEmail && hasSMS ? `<span class="notify-badge both">✅ Both</span>` : ""}
-    <button class="ghost small"
-      data-action="notifyTimeline"
-      data-id="${escapeHtml(String(e.id))}">
-      🕒 Timeline
-    </button>
-  </div>
-`;
-
-                    return `
-                      <div class="notify-badges">
-                        ${n.email ? `<span class="notify-badge email">📧 Email</span>` : ""}
-                        ${n.sms?.some(s => s.ok)
-                          ? `<span class="notify-badge sms">📱 SMS</span>`
-                          : ""}
-                        ${n.sms?.some(s => !s.ok)
-                          ? `<span class="notify-badge error">⚠ SMS Failed</span>`
-                          : ""}
-                        <button class="ghost small"
-                          data-action="notifyTimeline"
-                          data-id="${escapeHtml(String(e.id))}">
-                          🕒 Timeline
-                        </button>
-                      </div>
-                    `;
-                  })()
+  return `
+    <div class="notify-badges">
+      ${hasEmail ? `<span class="notify-badge email">📧 Email</span>` : ""}
+      ${hasSMS ? `<span class="notify-badge sms">📱 SMS</span>` : ""}
+      ${hasEmail && hasSMS ? `<span class="notify-badge both">✅ Both</span>` : ""}
+      <button class="ghost small"
+        data-action="notifyTimeline"
+        data-id="${escapeHtml(String(e.id))}">
+        🕒 Timeline
+      </button>
+    </div>
+  `;
+})()
                 }
 
                 <div class="small subtle">CST</div>
