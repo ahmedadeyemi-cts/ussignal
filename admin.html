@@ -216,19 +216,20 @@
   <div id="roster"></div>
 </section>
   <!-- AUTO-GEN -->
-  <section id="autogenTab" class="panel">
-    <h2>Auto-Generate Schedule</h2>
-    <div class="form-row">
-      <label>Start</label><input type="date" id="autogenStart" />
-      <label>End</label><input type="date" id="autogenEnd" />
-      <label>Seed</label><input type="number" id="autogenSeed" value="0" />
-      <button id="runAutogenBtn" class="primary">Run</button>
-    </div>
-      <!-- PS Customers -->
+<section id="autogenTab" class="panel">
+  <h2>Auto-Generate Schedule</h2>
+  <div class="form-row">
+    <label>Start</label><input type="date" id="autogenStart" />
+    <label>End</label><input type="date" id="autogenEnd" />
+    <label>Seed</label><input type="number" id="autogenSeed" value="0" />
+    <button id="runAutogenBtn" class="primary">Run</button>
+  </div>
+</section>
+
+<!-- ✅ PS CUSTOMERS (TOP-LEVEL PANEL) -->
 <section id="psCustomersTab" class="panel">
   <div class="panel-head">
-    <h2>Professional Services Customers</h2>
-
+    <h2>Active One Assist Customers</h2>
     <div class="panel-actions">
       <button id="psAddCustomerBtn" class="primary">Add Customer</button>
       <button id="psSaveCustomersBtn" class="ghost">Save</button>
@@ -240,13 +241,13 @@
     PINs must be <b>exactly 5 digits</b>. SMS authentication and IVR validation rely on these values.
   </div>
 
-  <!-- ✅ APP.JS RENDERS HERE -->
   <input
-  id="psCustomerSearch"
-  placeholder="Search customer name or PIN…"
-  class="input"
-  style="margin-bottom:10px;max-width:320px"
-/>
+    id="psCustomerSearch"
+    placeholder="Search customer name or PIN…"
+    class="input"
+    style="margin-bottom:10px;max-width:320px"
+  />
+
   <div id="psCustomers"></div>
 
   <div class="small subtle" style="margin-top:12px">
@@ -254,7 +255,6 @@
   </div>
 </section>
 
-  
   <!-- AUDIT -->
   <section id="auditTab" class="panel">
     <div class="panel-head">
