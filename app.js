@@ -1270,7 +1270,6 @@ async function loadScheduleAdmin(el) {
   APP_STATE.scheduleFull = data;
   APP_STATE.draftSchedule = deepClone(data);
   APP_STATE.editingEntryIds.clear();
- APP_STATE.notifyStatus = {};
 
 (data.entries || []).forEach(e => {
   if (e.notification) {
@@ -1394,7 +1393,7 @@ activeEntries.forEach(e => {
                   (() => {
                     const n = APP_STATE.notifyStatus[e.id] || {};
 const hasEmail = !!n.email;
-const hasSMS = !!n.sms;
+const hasSMS = Array.isArray(n.sms) && n.sms.length > 0;
 
 if (!hasEmail && !hasSMS) {
   return `<span class="notify-badge pending">⏳ Pending</span>`;
@@ -1578,10 +1577,9 @@ if (archivedEntries.length) {
       if (!res.ok) throw new Error(await res.text());
 
       // ✅ Persist UI state safely
-      const bucket = ensureNotifyBucket(id, { by: "admin", auto: false });
-      bucket.email = { sentAt: new Date().toISOString() };
-
+      await loadNotifyStatus();
       renderScheduleAdmin(el);
+
       toast("Email notification sent.");
     }
   );
@@ -1675,18 +1673,13 @@ if (action === "notifySMS") {
 
       if (!res.ok) throw new Error(await res.text());
 
-      // ✅ Persist UI state safely (prevents "unshift" crash)
-      const bucket = ensureNotifyBucket(id, { by: "admin", auto: false });
+      // 🔑 Re-sync from KV (authoritative)
+await loadNotifyStatus();
 
-      bucket.sms.unshift({
-        phone: "—",
-        ok: true,
-        status: "queued",
-        ts: new Date().toISOString()
-      });
+// 🔑 Re-render with persisted state
+renderScheduleAdmin(el);
 
-      renderScheduleAdmin(el);
-      toast("SMS notification sent.");
+toast("Email notification sent.");
     }
   );
   return;
