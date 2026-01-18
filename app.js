@@ -381,6 +381,15 @@ if (!APP_STATE.publicMode) {
   // FINALIZE UI FIRST (SAFE)
   // =========================
   applyRBACToUI();
+// 🔑 Load PS Customers if tab is already active (initial load)
+if (
+  !APP_STATE.publicMode &&
+  document.getElementById("psCustomersTab")?.classList.contains("active")
+) {
+  loadPsCustomers().catch(e =>
+    console.error("Initial PS Customers load failed:", e)
+  );
+}
 
  // =========================
 // LOAD DATA (ORDER MATTERS)
@@ -1911,7 +1920,7 @@ function psAddCustomerModal() {
       <div class="form-grid">
         <div class="field">
           <label>Customer Name</label>
-          <input id="psNewName" placeholder="City of West Des Moines" />
+          <input id="psNewName" placeholder="US Signal or Name of Customer" />
         </div>
         <div class="field">
           <label>5-Digit PIN</label>
@@ -2158,6 +2167,7 @@ function downloadPsCustomersIVRCSV() {
   }));
   downloadCSV("ps-customers-ivr.csv", rows);
 }
+
 /* =========================
  * Save / Notify / Export / ICS
  * ========================= */
@@ -2542,6 +2552,8 @@ function rosterAddUserModal() {
     "Cancel"
   );
 }
+
+
 
 async function saveRoster() {
   if (!APP_STATE.roster) throw new Error("Roster is empty.");
