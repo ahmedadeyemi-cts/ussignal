@@ -501,16 +501,24 @@ async function sendBrevoEmail(env, { to, subject, html }) {
       to,
       subject,
       htmlContent: html,
-      textContent: "On-call notification from US Signal."
+      textContent: "On-call notification from US Signal.",
+      replyTo: {
+        email: env.ADMIN_NOTIFICATION || env.BREVO_SENDER_EMAIL,
+        name: "On-Call Admin"
+      }
     })
   });
 
+  const body = await res.json();
+
   if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Brevo email failed ${res.status}: ${body}`);
+    throw new Error(`Brevo email failed ${res.status}: ${JSON.stringify(body)}`);
   }
 
-  console.log("[notify] Brevo email sent successfully");
+  console.log("[notify] Brevo accepted email:", {
+    messageId: body.messageId,
+    to
+  });
 }
 
 async function sendBrevoSms(env, { to, message }) {
