@@ -233,7 +233,7 @@ export async function onRequest(ctx) {
         const win = getPersonWindow(p, CFG.personWindow);
         const inWindow = inHhmmWindow(hhmmInTz(now, tz), win.start, win.end);
 
-        if (sendEmail && p.email && inWindow) {
+        if (sendEmail && p.email && (!auto || inWindow)) {
           emailTo.push({ email: p.email, name: p.name || "On-Call" });
         }
 
@@ -370,15 +370,14 @@ function hhmmInTz(d, tz) {
 }
 
 function dayOfWeekInTz(d, tz) {
-  return Number(
-    new Intl.DateTimeFormat("en-US", {
-      timeZone: tz,
-      weekday: "short"
-    })
-      .formatToParts(d)
-      .find(p => p.type === "weekday")?.value === "Mon"
-  );
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    weekday: "short"
+  })
+    .format(d)
+    .toUpperCase();
 }
+
 
 function inHhmmWindow(hm, start, end) {
   return toMin(hm) >= toMin(start) && toMin(hm) <= toMin(end);
@@ -414,17 +413,28 @@ function buildEmailHtml(BRAND, entry, tz, type, portal) {
 }
 
 async function sendBrevoEmail(env, payload) {
-  await fetch("https://api.brevo.com/v3/smtp/email", {
-    method: "POST",
-    headers: { "content-type": "application/json", "api-key": env.BREVO_API_KEY },
-    body: JSON.stringify({
-      sender: {
-        email: env.BREVO_SENDER_EMAIL,
-        name: env.BREVO_SENDER_NAME
-      },
-      ...payload
-    })
-  });
+  const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+  method: "POST",
+  headers: {
+    "content-type": "application/json",
+    "api-key": env.BREVO_API_KEY
+  },
+  body: JSON.stringify({
+    sender: {
+      email: env.BREVO_SENDER_EMAIL,
+      name: env.BREVO_SENDER_NAME
+    },
+    ...payload
+  })
+});
+
+const text = await res.text();
+
+if (!res.ok) {
+  throw new Error(`Brevo email failed ${res.status}: ${text}`);
+}
+
+console.log("[notify] Brevo email OK:", text);
 }
 
 async function sendBrevoSms(env, { to, message }) {
