@@ -1810,24 +1810,38 @@ async function loadPsCustomers() {
 
   const raw = await res.json();
 
-// 🔑 unwrap KV + Pages Functions responses
-let data =
-  raw?.customers
-    ? raw
-    : raw?.value
-    ? (typeof raw.value === "string" ? JSON.parse(raw.value) : raw.value)
-    : (typeof raw === "string" ? JSON.parse(raw) : raw);
+  // ─────────────────────────────────────────────
+  // 🔑 NORMALIZE ALL POSSIBLE KV SHAPES
+  // ─────────────────────────────────────────────
+  let container =
+    raw?.customers ??
+    raw?.value ??
+    raw;
 
-// 🔑 final safety
-APP_STATE.psCustomers = Array.isArray(data?.customers)
-  ? data.customers
-  : [];
+  // If stringified JSON
+  if (typeof container === "string") {
+    try { container = JSON.parse(container); } catch { container = {}; }
+  }
 
-renderPsCustomers();
+  let customers = container?.customers ?? container;
 
+  // If string again (nested KV)
+  if (typeof customers === "string") {
+    try { customers = JSON.parse(customers); } catch { customers = []; }
+  }
+
+  // OBJECT → ARRAY (THIS WAS MISSING)
+  if (customers && typeof customers === "object" && !Array.isArray(customers)) {
+    customers = Object.values(customers);
+  }
+
+  if (!Array.isArray(customers)) customers = [];
+
+  APP_STATE.psCustomers = customers;
 
   renderPsCustomers();
 }
+
 function renderPsCustomers() {
   const el = byId("psCustomers");
   if (!el) return;
