@@ -1,5 +1,5 @@
 /**
- * functions/api/admin/oncall/notify.js
+ * functions/api/admin/oncall/notify/index.js
  *
  * FINAL — AUTHORITATIVE NOTIFICATION SERVICE
  *
@@ -214,12 +214,15 @@ export async function onRequest(ctx) {
       const emailKey = `${CFG.kv.notifyPrefix}${entryKey}:email:${notifyType}`;
       const smsKey = `${CFG.kv.notifyPrefix}${entryKey}:sms:${notifyType}`;
 
-      if (sendEmail && (await env.ONCALL_KV.get(emailKey))) {
-        skipped.push({ entryKey, channel: "email", reason: "dedupe" });
-      }
-      if (sendSMS && (await env.ONCALL_KV.get(smsKey))) {
-        skipped.push({ entryKey, channel: "sms", reason: "dedupe" });
-      }
+     const skipEmail = sendEmail && (await env.ONCALL_KV.get(emailKey));
+const skipSms = sendSMS && (await env.ONCALL_KV.get(smsKey));
+
+if (skipEmail) {
+  skipped.push({ entryKey, channel: "email", reason: "dedupe" });
+}
+if (skipSms) {
+  skipped.push({ entryKey, channel: "sms", reason: "dedupe" });
+}
 
       /* ---------------------------------------------
        * RECIPIENTS
@@ -227,7 +230,7 @@ export async function onRequest(ctx) {
       const emailTo = [];
 
 // 🔔 Always include admin notification
-if (env.ADMIN_NOTIFICATION) {
+if (env.ADMIN_NOTIFICATION && env.ADMIN_NOTIFICATION.includes("@")) {
   emailTo.push({
     email: env.ADMIN_NOTIFICATION,
     name: "On-Call Admin"
@@ -253,7 +256,7 @@ if (env.ADMIN_NOTIFICATION) {
       /* ---------------------------------------------
        * EMAIL
        * --------------------------------------------- */
-      if (sendEmail && emailTo.length) {
+      if (sendEmail && emailTo.length > 0) {
         if (!dryRun) {
           await sendBrevoEmail(env, {
             to: emailTo,
@@ -282,19 +285,19 @@ if (env.ADMIN_NOTIFICATION) {
       /* ---------------------------------------------
        * SMS
        * --------------------------------------------- */
-      if (sendSMS && smsTo.length) {
-        for (const phone of smsTo) {
-          if (!dryRun) {
-            await sendBrevoSms(env, {
-              to: phone,
-              message: `US Signal On-Call: Your on-call duty starts now and ends ${formatCst(
-                end,
-                tz
-              )}.`
-            });
-          }
-          smsSent++;
-        }
+      if (sendSMS && smsTo.length && !skipSms) {
+  for (const phone of smsTo) {
+    if (!dryRun) {
+      await sendBrevoSms(env, {
+        to: phone,
+        message: `US Signal On-Call: Your on-call duty starts now and ends ${formatCstFromIso(
+          entry.endISO,
+          tz
+        )}.`
+      });
+    }
+    smsSent++;
+  }
 
         if (!dryRun) {
           await env.ONCALL_KV.put(
