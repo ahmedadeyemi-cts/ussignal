@@ -359,9 +359,9 @@ if (!APP_STATE.publicMode) {
   // =========================
   applyRBACToUI();
 
-  // =========================
-  // LOAD DATA (NON-BLOCKING)
-  // =========================
+ // =========================
+// LOAD DATA (ORDER MATTERS)
+// =========================
 const scheduleEl = byId("schedule");
 if (!scheduleEl) {
   console.error("Schedule container (#schedule) not found");
@@ -370,6 +370,10 @@ if (!scheduleEl) {
     await loadSchedulePublic(scheduleEl);
     startCurrentOnCallAutoRefresh();
   } else {
+    // 🔑 LOAD PERSISTED NOTIFY STATE FIRST
+    await loadNotifyStatus();
+
+    // 🔑 THEN load & render schedule
     await loadScheduleAdmin(scheduleEl);
   }
 }
@@ -1388,8 +1392,26 @@ activeEntries.forEach(e => {
 
                 ${
                   (() => {
-                    const n = APP_STATE.notifyStatus[e.id];
-                    if (!n) return `<span class="notify-badge pending">⏳ Pending</span>`;
+                    const n = APP_STATE.notifyStatus[e.id] || {};
+const hasEmail = !!n.email;
+const hasSMS = !!n.sms;
+
+if (!hasEmail && !hasSMS) {
+  return `<span class="notify-badge pending">⏳ Pending</span>`;
+}
+
+return `
+  <div class="notify-badges">
+    ${hasEmail ? `<span class="notify-badge email">📧 Email</span>` : ""}
+    ${hasSMS ? `<span class="notify-badge sms">📱 SMS</span>` : ""}
+    ${hasEmail && hasSMS ? `<span class="notify-badge both">✅ Both</span>` : ""}
+    <button class="ghost small"
+      data-action="notifyTimeline"
+      data-id="${escapeHtml(String(e.id))}">
+      🕒 Timeline
+    </button>
+  </div>
+`;
 
                     return `
                       <div class="notify-badges">
@@ -2319,6 +2341,18 @@ function wireRosterBulkUpload() {
 
     input.value = "";
   };
+}
+async function loadNotifyStatus() {
+  try {
+    const res = await fetch("/api/admin/oncall/notify-status", {
+      cache: "no-store"
+    });
+    if (!res.ok) return;
+
+    APP_STATE.notifyStatus = await res.json();
+  } catch (e) {
+    console.warn("notify-status load failed", e);
+  }
 }
 
 /* =========================
