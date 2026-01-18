@@ -411,29 +411,29 @@ function buildEmailHtml(BRAND, entry, tz, type, portal) {
     </div>
   `;
 }
-
-async function sendBrevoEmail(env, payload) {
+async function sendBrevoEmail(env, { to, subject, html }) {
   const res = await fetch("https://api.brevo.com/v3/smtp/email", {
-  method: "POST",
-  headers: {
-    "content-type": "application/json",
-    "api-key": env.BREVO_API_KEY
-  },
-  body: JSON.stringify({
-    sender: {
-      email: env.BREVO_SENDER_EMAIL,
-      name: env.BREVO_SENDER_NAME
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "api-key": env.BREVO_API_KEY
     },
-    ...payload
-  })
-});
+    body: JSON.stringify({
+      sender: {
+        email: env.BREVO_SENDER_EMAIL,
+        name: env.BREVO_SENDER_NAME
+      },
+      to,
+      subject,
+      htmlContent: html,          // ✅ THIS IS THE FIX
+      textContent: "On-call notification from US Signal."
+    })
+  });
 
-const text = await res.text();
-
-if (!res.ok) {
-  throw new Error(`Brevo email failed ${res.status}: ${text}`);
-}
-
+  if (!res.ok) {
+    const t = await res.text();
+    throw new Error(`Brevo email failed ${res.status}: ${t}`);
+  }
 console.log("[notify] Brevo email OK:", text);
 }
 
