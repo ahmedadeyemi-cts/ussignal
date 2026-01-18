@@ -1431,6 +1431,12 @@ activeEntries.forEach(e => {
                   data-id="${escapeHtml(String(e.id))}">
                   Send SMS Only
                 </button>
+                
+                <button class="ghost"
+                  data-action="notifyEmail"
+                  data-id="${escapeHtml(String(e.id))}">
+                  Send Email Only
+                </button>
               `
               : ""
           }
@@ -1523,6 +1529,42 @@ if (archivedEntries.length) {
     btn.onclick = async () => {
       const action = btn.getAttribute("data-action");
       const id = btn.getAttribute("data-id");
+      if (action === "notifyEmail") {
+  const entry = APP_STATE.scheduleFull?.entries?.find(
+    e => String(e.id) === String(id)
+  );
+
+  if (!entry || isPastOnCall(entry)) {
+    toast("Cannot send email for past on-call weeks.");
+    return;
+  }
+
+  confirmModal(
+    "Send Email Notification",
+    "Send email notification to the on-call user(s) for this week?",
+    async () => {
+      const res = await fetchAuth(`/api/admin/oncall/notify`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          mode: "email",
+          entryId: id,
+          auto: false
+        })
+      });
+
+      if (!res.ok) throw new Error(await res.text());
+
+      // ✅ Persist UI state safely
+      const bucket = ensureNotifyBucket(id, { by: "admin", auto: false });
+      bucket.email = { sentAt: new Date().toISOString() };
+
+      renderScheduleAdmin(el);
+      toast("Email notification sent.");
+    }
+  );
+  return;
+}
       if (action === "notifyTimeline") {
   await openNotifyTimeline(id);
   return;
