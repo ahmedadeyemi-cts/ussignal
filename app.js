@@ -419,6 +419,12 @@ if (!APP_STATE.publicMode && byId("psCustomers")) {
   }
 }
 
+/* ✅ CLOSE initApp HERE */
+}
+
+/* =========================
+ * Reload Schedule
+ * ========================= */
 async function reloadSchedule() {
   const el = byId("schedule");
   if (!el) return;
