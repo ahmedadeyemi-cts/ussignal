@@ -77,6 +77,17 @@
     .small.subtle {
       color: #6b7280;
     }
+    #psCustomersTab input {
+  width: 100%;
+  padding: 6px 8px;
+  font-family: monospace;
+}
+
+#psCustomersTab input[maxlength="5"] {
+  letter-spacing: 1px;
+  text-align: center;
+}
+
   </style>
 </head>
 
@@ -114,11 +125,12 @@
 <nav class="tabs">
   <button class="tab active" data-tab="scheduleTab">Schedule</button>
   <button class="tab" data-tab="currentTab">Who’s On Call Now</button>
-  <button class="tab" data-tab="timelineTab">Timeline</button>
+  <button class="tab" data-tab="psCustomersTab" data-requires="admin">PS Customers </button>
   <button class="tab" data-tab="rosterTab" data-requires="admin">Roster</button>
   <button class="tab" data-tab="autogenTab" data-requires="admin">Auto-Generate</button>
   <button class="tab" data-tab="auditTab" data-requires="admin">Audit</button>
   <button class="tab" data-tab="historyTab" data-requires="admin">History</button>
+  
 </nav>
 
 <main class="container">
@@ -213,7 +225,40 @@
       <button id="runAutogenBtn" class="primary">Run</button>
     </div>
   </section>
+<!-- PS CUSTOMERS -->
+<section id="psCustomersTab" class="panel">
+  <div class="panel-head">
+    <h2>Professional Services Customers</h2>
 
+    <div class="panel-actions">
+      <button id="psAddCustomerBtn" class="primary">Add Customer</button>
+      <button id="psSaveCustomersBtn" class="ghost">Save</button>
+      <button id="psReloadCustomersBtn" class="ghost">Reload</button>
+    </div>
+  </div>
+
+  <div class="small subtle" style="margin-bottom:10px">
+    PINs must be <b>exactly 5 digits</b>. SMS authentication and IVR validation
+    rely on these values.
+  </div>
+
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th style="width:55%">Customer Name</th>
+        <th style="width:25%">PIN</th>
+        <th style="width:20%"></th>
+      </tr>
+    </thead>
+    <tbody id="psCustomersTableBody">
+      <!-- rows injected by app.js -->
+    </tbody>
+  </table>
+
+  <div class="small subtle" style="margin-top:12px">
+    Changes are not active until <b>Save</b> is clicked.
+  </div>
+</section>
   <!-- AUDIT -->
   <section id="auditTab" class="panel">
     <div class="panel-head">
