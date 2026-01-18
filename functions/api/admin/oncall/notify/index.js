@@ -425,16 +425,17 @@ async function sendBrevoEmail(env, { to, subject, html }) {
       },
       to,
       subject,
-      htmlContent: html,          // ✅ THIS IS THE FIX
+      htmlContent: html,
       textContent: "On-call notification from US Signal."
     })
   });
 
   if (!res.ok) {
-    const t = await res.text();
-    throw new Error(`Brevo email failed ${res.status}: ${t}`);
+    const body = await res.text();
+    throw new Error(`Brevo email failed ${res.status}: ${body}`);
   }
-console.log("[notify] Brevo email OK:", text);
+
+  console.log("[notify] Brevo email sent successfully");
 }
 
 async function sendBrevoSms(env, { to, message }) {
