@@ -273,8 +273,20 @@ async function initApp(ctx = {}) {
       ? ctx.departments
       : DEPT_KEYS.slice();
   }
+  const psSearch = byId("psCustomerSearch");
+  if (psSearch) {
+    psSearch.oninput = () => renderPsCustomers();
+  }
 
   // continue with UI wiring...
+const psUploadBtn = byId("psUploadCsvBtn");
+const psUploadInput = byId("psUploadCsvInput");
+
+if (psUploadBtn && psUploadInput) {
+  psUploadBtn.onclick = () => psUploadInput.click();
+  psUploadInput.onchange = () =>
+    handlePsCustomersBulkUpload(psUploadInput.files?.[0]);
+}
 
    // =========================
   // Role Badge
@@ -362,7 +374,8 @@ if (!APP_STATE.publicMode) {
     savePsCustomers
   ));
   onClick("psReloadCustomersBtn", loadPsCustomers);
-
+  onClick("psDownloadCsvBtn", downloadPsCustomersCSV);
+  onClick("psDownloadIvrBtn", downloadPsCustomersIVRCSV);
 
     // =========================
   // FINALIZE UI FIRST (SAFE)
@@ -397,7 +410,15 @@ if (byId("roster")) {
     toast("Unable to load roster.", 5000);
   }
 }
-} // ✅ END initApp
+// 🔑 LOAD PS CUSTOMERS (ADMIN ONLY)
+if (!APP_STATE.publicMode && byId("psCustomers")) {
+  try {
+    await loadPsCustomers();
+  } catch (e) {
+    console.error("PS Customers load failed:", e);
+  }
+}
+
 async function reloadSchedule() {
   const el = byId("schedule");
   if (!el) return;
@@ -1777,12 +1798,18 @@ async function loadPsCustomers() {
 
   renderPsCustomers();
 }
-
 function renderPsCustomers() {
   const el = byId("psCustomers");
   if (!el) return;
 
-  const list = APP_STATE.psCustomers || [];
+  const search =
+    byId("psCustomerSearch")?.value.trim().toLowerCase() || "";
+
+  const list = (APP_STATE.psCustomers || []).filter(c =>
+    !search ||
+    c.name?.toLowerCase().includes(search) ||
+    c.pin?.includes(search)
+  );
 
   el.innerHTML = `
     <table class="roster-table">
@@ -1894,12 +1921,17 @@ function psAddCustomerModal() {
       if (!name) throw new Error("Customer name is required.");
       if (!/^\d{5}$/.test(pin)) throw new Error("PIN must be exactly 5 digits.");
 
-      APP_STATE.psCustomers ||= [];
-      APP_STATE.psCustomers.push({
-        id: crypto.randomUUID(),
-        name,
-        pin
-      });
+     APP_STATE.psCustomers ||= [];
+// 🚫 Enforce PIN uniqueness
+if (APP_STATE.psCustomers.some(c => c.pin === pin)) {
+  throw new Error("That PIN is already assigned to another customer.");
+}
+
+APP_STATE.psCustomers.push({
+  id: crypto.randomUUID(),
+  name,
+  pin
+});
 
       renderPsCustomers();
       HAS_UNSAVED_CHANGES = true;
@@ -1912,14 +1944,21 @@ function psAddCustomerModal() {
 
 async function savePsCustomers() {
   const list = APP_STATE.psCustomers || [];
-
   for (const c of list) {
     if (!c.name || !/^\d{5}$/.test(c.pin)) {
       toast("All customers must have a name and a valid 5-digit PIN.");
       return;
     }
   }
-
+// 🚫 Enforce unique PINs across all customers
+const pinSet = new Set();
+for (const c of list) {
+  if (pinSet.has(c.pin)) {
+    toast(`Duplicate PIN detected: ${c.pin}`);
+    return;
+  }
+  pinSet.add(c.pin);
+}
   const res = await fetchAuth(`/api/admin/ps-customers/save`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -1935,7 +1974,61 @@ async function savePsCustomers() {
   updateSaveState?.();
   await loadPsCustomers();
 }
+async function handlePsCustomersBulkUpload(file) {
+  if (!file) return;
 
+  const rows = await parseSpreadsheet(file);
+  if (!rows.length) {
+    toast("CSV is empty.");
+    return;
+  }
+
+  const draft = deepClone(APP_STATE.psCustomers || []);
+  const preview = [];
+  const warnings = [];
+  const pinSet = new Set(draft.map(c => c.pin));
+
+  rows.forEach((r, i) => {
+    const name = (r.name || r.customer_name || "").trim();
+    const pin = String(r.pin || "").trim();
+
+    if (!name || !/^\d{5}$/.test(pin)) {
+      warnings.push(`Row ${i + 1}: invalid name or PIN`);
+      return;
+    }
+
+    if (pinSet.has(pin)) {
+      warnings.push(`Row ${i + 1}: duplicate PIN ${pin}`);
+      return;
+    }
+
+    pinSet.add(pin);
+    preview.push(`${name} (${pin})`);
+    draft.push({
+      id: crypto.randomUUID(),
+      name,
+      pin
+    });
+  });
+
+  showModal(
+    "PS Customers Upload Preview",
+    `
+      <ul>${preview.map(p => `<li>${escapeHtml(p)}</li>`).join("")}</ul>
+      ${warnings.length ? `<div class="small" style="color:#ef4444">${warnings.join("<br>")}</div>` : ""}
+    `,
+    "Apply",
+    async () => {
+      APP_STATE.psCustomers = draft;
+      renderPsCustomers();
+      HAS_UNSAVED_CHANGES = true;
+      updateSaveState();
+      toast("Bulk upload applied (not saved).");
+      return true;
+    },
+    "Cancel"
+  );
+}
 /* =========================
  * Notify Status Normalizer (FIX for SMS unshift undefined)
  * ========================= */
@@ -2042,7 +2135,23 @@ function downloadCSV(filename, rows) {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+function downloadPsCustomersCSV() {
+  const rows = (APP_STATE.psCustomers || []).map(c => ({
+    id: c.id,
+    name: c.name,
+    pin: c.pin
+  }));
+  downloadCSV("ps-customers.csv", rows);
+}
 
+function downloadPsCustomersIVRCSV() {
+  const rows = (APP_STATE.psCustomers || []).map(c => ({
+    pin: c.pin,
+    customer_name: c.name,
+    customer_id: c.id
+  }));
+  downloadCSV("ps-customers-ivr.csv", rows);
+}
 /* =========================
  * Save / Notify / Export / ICS
  * ========================= */
