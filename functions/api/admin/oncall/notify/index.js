@@ -225,6 +225,14 @@ export async function onRequest(ctx) {
        * RECIPIENTS
        * --------------------------------------------- */
       const emailTo = [];
+
+// 🔔 Always include admin notification
+if (env.ADMIN_NOTIFICATION) {
+  emailTo.push({
+    email: env.ADMIN_NOTIFICATION,
+    name: "On-Call Admin"
+  });
+}
       const smsTo = [];
 
       for (const p of Object.values(entry.departments || {})) {
@@ -250,9 +258,9 @@ export async function onRequest(ctx) {
           await sendBrevoEmail(env, {
             to: emailTo,
             subject:
-              notifyType === "UPCOMING"
-                ? "Upcoming On-Call Assignment"
-                : "On-Call Starts Today",
+            notifyType === "UPCOMING"
+              ? "On-Call Reminder – Upcoming Week"
+               : "On-Call Starts Today – Action Required",
             html: buildEmailHtml(
               BRAND,
               entry,
@@ -395,20 +403,85 @@ function getPersonWindow(p, fallback) {
   };
 }
 
-function formatCst(d, tz) {
-  return d.toLocaleString("en-US", { timeZone: tz });
+function formatCstFromIso(iso, tz) {
+  return new Date(
+    new Date(iso).toLocaleString("en-US", { timeZone: tz })
+  ).toLocaleString("en-US", {
+    timeZone: tz,
+    weekday: "short",
+    month: "2-digit",
+    day: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true
+  });
 }
 
 function buildEmailHtml(BRAND, entry, tz, type, portal) {
+  const start = formatCstFromIso(entry.startISO, tz);
+  const end = formatCstFromIso(entry.endISO, tz);
+
+  const deptLines = Object.entries(entry.departments || {})
+    .map(([key, p]) => {
+      if (!p) return "";
+      const label = ({
+        enterprise_network: "Enterprise Network",
+        collaboration: "Collaboration",
+        system_storage: "System & Storage"
+      })[key] || key;
+
+      return `<li>
+        <b>${label}:</b>
+        ${p.name || "Unassigned"} –
+        ${p.phone || "N/A"} –
+        ${p.email || "N/A"}
+      </li>`;
+    })
+    .join("");
+
   return `
-    <div style="font-family:Arial">
-      <img src="${BRAND.logo}" style="max-width:180px"/>
-      <h2>${type === "UPCOMING" ? "On-Call Reminder" : "On-Call Starts Today"}</h2>
-      <p>Start: ${formatCst(new Date(entry.startISO), tz)}</p>
-      <p>End: ${formatCst(new Date(entry.endISO), tz)}</p>
-      <p><a href="${portal}">View Schedule</a></p>
-      <small>${BRAND.footer}</small>
-    </div>
+  <div style="font-family:Arial, sans-serif; max-width:640px">
+    <img src="${BRAND.logo}" style="max-width:180px;margin-bottom:16px"/>
+
+    <p>
+      This is an <b>on-call reminder</b> message. You are receiving this email
+      because you are scheduled to provide on-call support during the upcoming week.
+    </p>
+
+    <p>
+      <b>On-call support begins:</b><br/>
+      ${start}
+    </p>
+
+    <p>
+      <b>On-call support ends:</b><br/>
+      ${end}
+    </p>
+
+    <p>
+      Please reach out to your Manager or Team Lead if you need to make changes
+      to your on-call availability.
+    </p>
+
+    <hr/>
+
+    <p>
+      <b>On-call schedule for week starting ${start}:</b>
+    </p>
+
+    <ul>
+      ${deptLines}
+    </ul>
+
+    <p style="margin-top:16px">
+      <a href="${portal}">View Schedule</a>
+    </p>
+
+    <hr/>
+    <small>${BRAND.footer}</small>
+  </div>
   `;
 }
 async function sendBrevoEmail(env, { to, subject, html }) {
