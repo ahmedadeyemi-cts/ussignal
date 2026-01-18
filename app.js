@@ -1745,6 +1745,186 @@ el.querySelectorAll("select[data-field='email']").forEach(sel => {
   });
 }
 /* =========================
+ * PS Customers (Professional Services)
+ * ========================= */
+
+async function loadPsCustomers() {
+  const el = byId("psCustomers");
+  if (!el) return;
+
+  el.innerHTML = `<div class="subtle">Loading PS customers…</div>`;
+
+  const res = await fetchAuth(`/api/admin/ps-customers`, { method: "GET" });
+  if (!res.ok) {
+    el.innerHTML = `<div class="subtle">Unable to load PS customers.</div>`;
+    return;
+  }
+
+  const data = await res.json();
+  APP_STATE.psCustomers = Array.isArray(data.customers) ? data.customers : [];
+
+  renderPsCustomers();
+}
+
+function renderPsCustomers() {
+  const el = byId("psCustomers");
+  if (!el) return;
+
+  const list = APP_STATE.psCustomers || [];
+
+  el.innerHTML = `
+    <table class="roster-table">
+      <thead>
+        <tr>
+          <th style="width:50%">Customer Name</th>
+          <th style="width:20%">PIN</th>
+          <th style="width:20%">Customer ID</th>
+          <th style="width:10%"></th>
+        </tr>
+      </thead>
+      <tbody>
+        ${list.map((c, idx) => `
+          <tr>
+            <td>
+              <input
+                data-ps="1"
+                data-idx="${idx}"
+                data-field="name"
+                value="${escapeHtml(c.name || "")}"
+              />
+            </td>
+            <td>
+              <input
+                data-ps="1"
+                data-idx="${idx}"
+                data-field="pin"
+                maxlength="5"
+                pattern="\\d{5}"
+                value="${escapeHtml(c.pin || "")}"
+              />
+            </td>
+            <td class="small subtle">
+              ${escapeHtml(c.id)}
+            </td>
+            <td>
+              <button
+                class="iconbtn"
+                data-ps-remove="1"
+                data-idx="${idx}"
+                title="Remove"
+              >🗑</button>
+            </td>
+          </tr>
+        `).join("")}
+      </tbody>
+    </table>
+
+    <div class="small subtle" style="margin-top:8px">
+      PINs must be exactly 5 digits.
+    </div>
+  `;
+
+  // inline edits
+  el.querySelectorAll("input[data-ps]").forEach(inp => {
+    inp.oninput = () => {
+      HAS_UNSAVED_CHANGES = true;
+
+      const idx = Number(inp.getAttribute("data-idx"));
+      const field = inp.getAttribute("data-field");
+      if (!APP_STATE.psCustomers?.[idx]) return;
+
+      APP_STATE.psCustomers[idx][field] = inp.value.trim();
+    };
+  });
+
+  // remove
+  el.querySelectorAll("button[data-ps-remove]").forEach(btn => {
+    btn.onclick = () => {
+      const idx = Number(btn.getAttribute("data-idx"));
+      if (!APP_STATE.psCustomers?.[idx]) return;
+
+      showModal(
+        "Remove PS Customer",
+        "Remove this customer and PIN?",
+        "Remove",
+        async () => {
+          APP_STATE.psCustomers.splice(idx, 1);
+          renderPsCustomers();
+          toast("Customer removed (not saved).");
+          return true;
+        },
+        "Cancel"
+      );
+    };
+  });
+}
+
+function psAddCustomerModal() {
+  showModal(
+    "Add PS Customer",
+    `
+      <div class="form-grid">
+        <div class="field">
+          <label>Customer Name</label>
+          <input id="psNewName" placeholder="City of West Des Moines" />
+        </div>
+        <div class="field">
+          <label>5-Digit PIN</label>
+          <input id="psNewPin" maxlength="5" placeholder="12345" />
+        </div>
+      </div>
+    `,
+    "Add",
+    async () => {
+      const name = byId("psNewName")?.value.trim();
+      const pin = byId("psNewPin")?.value.trim();
+
+      if (!name) throw new Error("Customer name is required.");
+      if (!/^\d{5}$/.test(pin)) throw new Error("PIN must be exactly 5 digits.");
+
+      APP_STATE.psCustomers ||= [];
+      APP_STATE.psCustomers.push({
+        id: crypto.randomUUID(),
+        name,
+        pin
+      });
+
+      renderPsCustomers();
+      HAS_UNSAVED_CHANGES = true;
+      toast("Customer added (not saved).");
+      return true;
+    },
+    "Cancel"
+  );
+}
+
+async function savePsCustomers() {
+  const list = APP_STATE.psCustomers || [];
+
+  for (const c of list) {
+    if (!c.name || !/^\d{5}$/.test(c.pin)) {
+      toast("All customers must have a name and a valid 5-digit PIN.");
+      return;
+    }
+  }
+
+  const res = await fetchAuth(`/api/admin/ps-customers/save`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      customers: list
+    })
+  });
+
+  if (!res.ok) throw new Error(await res.text());
+
+  toast("PS customers saved.");
+  HAS_UNSAVED_CHANGES = false;
+  updateSaveState?.();
+  await loadPsCustomers();
+}
+
+/* =========================
  * Notify Status Normalizer (FIX for SMS unshift undefined)
  * ========================= */
 function ensureNotifyBucket(entryId, { by = "admin", auto = false } = {}) {
