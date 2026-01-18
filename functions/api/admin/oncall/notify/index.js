@@ -256,32 +256,31 @@ if (env.ADMIN_NOTIFICATION && env.ADMIN_NOTIFICATION.includes("@")) {
       /* ---------------------------------------------
        * EMAIL
        * --------------------------------------------- */
-      if (sendEmail && emailTo.length > 0) {
-        if (!dryRun) {
-          await sendBrevoEmail(env, {
-            to: emailTo,
-            subject:
-            notifyType === "UPCOMING"
-              ? "On-Call Reminder – Upcoming Week"
-               : "On-Call Starts Today – Action Required",
-            html: buildEmailHtml(
-              BRAND,
-              entry,
-              tz,
-              notifyType,
-              env.PUBLIC_PORTAL_URL
-            )
-          });
+    if (sendEmail && emailTo.length > 0 && !skipEmail) {
+  if (!dryRun) {
+    await sendBrevoEmail(env, {
+      to: emailTo,
+      subject:
+        notifyType === "UPCOMING"
+          ? "On-Call Reminder – Upcoming Week"
+          : "On-Call Starts Today – Action Required",
+      html: buildEmailHtml(
+        BRAND,
+        entry,
+        tz,
+        notifyType,
+        env.PUBLIC_PORTAL_URL
+      )
+    });
 
-          await env.ONCALL_KV.put(
-            emailKey,
-            JSON.stringify({ ts: new Date().toISOString() }),
-            { expirationTtl: 60 * 60 * 24 * 45 }
-          );
-        }
-        emailsSent += emailTo.length;
-      }
-
+    await env.ONCALL_KV.put(
+      emailKey,
+      JSON.stringify({ ts: new Date().toISOString() }),
+      { expirationTtl: 60 * 60 * 24 * 45 }
+    );
+  }
+  emailsSent += emailTo.length;
+}
       /* ---------------------------------------------
        * SMS
        * --------------------------------------------- */
