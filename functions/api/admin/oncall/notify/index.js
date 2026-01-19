@@ -269,9 +269,9 @@ if (env.ADMIN_NOTIFICATION) {
         const win = getPersonWindow(p, CFG.personWindow);
         const inWindow = inHhmmWindow(hhmmInTz(now, tz), win.start, win.end);
 
-        if (sendEmail && p.email && (!auto || inWindow)) {
-          emailTo.push({ email: p.email, name: p.name || "On-Call" });
-        }
+        if (sendEmail && p.email && (!auto || inWindow || force)) {
+  emailTo.push({ email: p.email, name: p.name || "On-Call" });
+}
 
         if (sendSMS && p.phone && inWindow && notifyType === "START_TODAY") {
           smsTo.push(p.phone);
