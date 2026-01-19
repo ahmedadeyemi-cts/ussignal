@@ -2,15 +2,33 @@
  * GET /api/admin/oncall/cron-preview
  *
  * Dry-run preview of cron behavior.
- * No sends. No KV writes. No auth required.
+ * No sends. No KV writes.
+ * Protected via CRON_SHARED_SECRET if defined.
  */
 
-export async function onRequest({ env }) {
+export async function onRequest({ request, env }) {
   try {
+    /* --------------------------------------------------
+     * OPTIONAL SHARED-SECRET PROTECTION
+     * -------------------------------------------------- */
+    const secret = env.CRON_SHARED_SECRET;
+    if (secret) {
+      const hdr = request.headers.get("x-cron-secret");
+      if (hdr !== secret) {
+        return json({ ok: false, error: "unauthorized" }, 401);
+      }
+    }
+
+    /* --------------------------------------------------
+     * KV VALIDATION
+     * -------------------------------------------------- */
     if (!env.ONCALL_KV) {
       return json({ ok: false, error: "kv_not_bound" }, 500);
     }
 
+    /* --------------------------------------------------
+     * TIME CONTEXT (America/Chicago)
+     * -------------------------------------------------- */
     const now = new Date(
       new Date().toLocaleString("en-US", { timeZone: "America/Chicago" })
     );
@@ -33,6 +51,9 @@ export async function onRequest({ env }) {
       });
     }
 
+    /* --------------------------------------------------
+     * LOAD SCHEDULE
+     * -------------------------------------------------- */
     const raw = await env.ONCALL_KV.get("ONCALL:SCHEDULE");
     if (!raw) {
       return json({ ok: false, error: "schedule_not_found" }, 404);
@@ -42,8 +63,6 @@ export async function onRequest({ env }) {
     const entries = Array.isArray(schedule.entries)
       ? schedule.entries
       : [];
-
-    const tz = schedule.tz || "America/Chicago";
 
     const targets = [];
 
@@ -71,9 +90,10 @@ export async function onRequest({ env }) {
       const emailRecipients = [];
       const smsRecipients = [];
 
-      // Admin notifications
+      /* Admin notifications */
       if (env.ADMIN_NOTIFICATION) {
-        env.ADMIN_NOTIFICATION.split(",")
+        env.ADMIN_NOTIFICATION
+          .split(",")
           .map(e => e.trim())
           .filter(Boolean)
           .forEach(e => emailRecipients.push(e));
@@ -120,6 +140,9 @@ export async function onRequest({ env }) {
   }
 }
 
+/* --------------------------------------------------
+ * JSON HELPER
+ * -------------------------------------------------- */
 function json(body, status = 200) {
   return new Response(JSON.stringify(body, null, 2), {
     status,
