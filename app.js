@@ -929,25 +929,39 @@ function buildBulkOnCallWindow(startYMD) {
  * ========================= */
 
 function validateOnCallWindow(startISO, endISO) {
-  const s = isoToDateLocalAssumed(startISO);
-  const e = isoToDateLocalAssumed(endISO);
+  const s = parseLocalIsoParts(startISO);
+  const e = parseLocalIsoParts(endISO);
 
-  if (isNaN(s) || isNaN(e)) return "Invalid date/time format.";
-  if (s >= e) return "End must be after start.";
-  if (s.getDay() !== 5) return "Start must be on a Friday.";
-  if (e.getDay() !== 5) return "End must be on a Friday.";
-  if (s.getHours() !== 16 || s.getMinutes() !== 0) return "Start time must be 4:00 PM CST.";
-  if (e.getHours() !== 7 || e.getMinutes() !== 0) return "End time must be 7:00 AM CST.";
+  if (!s || !e) return "Invalid date/time format.";
 
-  const diffMs = e - s;
-const expectedMs =
-  (6 * 24 * 60 * 60 * 1000) +  // 6 days
-  (15 * 60 * 60 * 1000);     // + 15 hours
+  // Friday = 5
+  const sDay = new Date(s.y, s.mo - 1, s.d).getDay();
+  const eDay = new Date(e.y, e.mo - 1, e.d).getDay();
 
-if (Math.abs(diffMs - expectedMs) > 60_000) {
-  return "On-call window must be Friday 4:00 PM → Friday 7:00 AM CST.";
-}
+  if (sDay !== 5) return "Start must be on a Friday.";
+  if (eDay !== 5) return "End must be on a Friday.";
 
+  // STRICT wall-time checks (CST intent)
+  if (s.h !== 16 || s.mi !== 0) {
+    return "Start time must be 4:00 PM CST.";
+  }
+
+  if (e.h !== 7 || e.mi !== 0) {
+    return "End time must be 7:00 AM CST.";
+  }
+
+  // Duration check: exactly 6 days + 15 hours
+  const startUtc = Date.UTC(s.y, s.mo - 1, s.d, s.h, s.mi);
+  const endUtc = Date.UTC(e.y, e.mo - 1, e.d, e.h, e.mi);
+
+  const diffMs = endUtc - startUtc;
+  const expectedMs =
+    (6 * 24 * 60 * 60 * 1000) + // 6 days
+    (15 * 60 * 60 * 1000);     // +15 hours
+
+  if (Math.abs(diffMs - expectedMs) > 60_000) {
+    return "On-call window must be Friday 4:00 PM → Friday 7:00 AM CST.";
+  }
 
   return null;
 }
