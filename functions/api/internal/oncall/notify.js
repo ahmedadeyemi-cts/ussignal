@@ -9,7 +9,6 @@
 
 export async function onRequestPost({ request, env }) {
   try {
-    /* ---------------- AUTH ---------------- */
     const secret = env.CRON_SHARED_SECRET;
     if (!secret) {
       return json({ ok: false, error: "cron_secret_not_set" }, 500);
@@ -20,29 +19,25 @@ export async function onRequestPost({ request, env }) {
       return json({ ok: false, error: "unauthorized" }, 401);
     }
 
-    /* ---------------- PARSE BODY ---------------- */
+    if (!env.PUBLIC_PORTAL_URL) {
+      return json({
+        ok: false,
+        error: "missing_PUBLIC_PORTAL_URL"
+      }, 500);
+    }
+
     let payload = {};
     try {
       payload = await request.json();
-    } catch {
-      payload = {};
-    }
+    } catch {}
 
-    const {
-      cronHint = null,
-      mode = "email",
-      auto = true,
-      dryRun = false
-    } = payload;
+    const { cronHint = "MONDAY", mode = "email", dryRun = true } = payload;
 
-    if (!cronHint) {
-      return json({ ok: false, error: "missing_cronHint" }, 400);
-    }
+    const targetUrl = `${env.PUBLIC_PORTAL_URL}/api/admin/oncall/notify`;
 
-    /* ---------------- FIRE AUTHORITATIVE NOTIFY ---------------- */
-    const res = await fetch(
-      `${env.PUBLIC_PORTAL_URL}/api/admin/oncall/notify`,
-      {
+    let res;
+    try {
+      res = await fetch(targetUrl, {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -51,41 +46,37 @@ export async function onRequestPost({ request, env }) {
         body: JSON.stringify({
           cronHint,
           mode,
-          auto,
+          auto: true,
           dryRun
         })
-      }
-    );
-
-    const text = await res.text();
-
-    if (!res.ok) {
-      return json(
-        {
-          ok: false,
-          error: "notify_failed",
-          status: res.status,
-          response: text
-        },
-        500
-      );
+      });
+    } catch (fetchErr) {
+      return json({
+        ok: false,
+        error: "fetch_failed",
+        details: String(fetchErr)
+      }, 500);
     }
 
+    const rawText = await res.text();
+
     return json({
-      ok: true,
-      triggeredBy: "cron",
-      cronHint,
-      mode,
-      response: JSON.parse(text)
+      ok: res.ok,
+      status: res.status,
+      called: targetUrl,
+      responseType: res.headers.get("content-type"),
+      rawResponse: rawText.slice(0, 500)
     });
 
   } catch (err) {
-    console.error("[internal-notify] fatal", err);
-    return json({ ok: false, error: "internal_error" }, 500);
+    return json({
+      ok: false,
+      error: "fatal_exception",
+      details: String(err)
+    }, 500);
   }
 }
 
-/* ❗ OPTIONAL BUT SAFE — allows GET for quick validation */
 export const onRequestGet = onRequestPost;
 
 function json(body, status = 200) {
