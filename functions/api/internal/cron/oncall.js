@@ -1,13 +1,24 @@
 /**
  * POST /api/internal/cron/oncall
  *
- * Manual + Cron trigger endpoint
- * Protected via x-cron-secret
+ * Internal cron + manual trigger endpoint
+ * - Used by Cloudflare Scheduled Triggers
+ * - Can be manually invoked via Postman
+ * - NEVER touches /api/admin/*
+ *
+ * Security:
+ * - Protected by x-cron-secret
+ *
+ * Behavior:
+ * - Monday  → UPCOMING (email only)
+ * - Friday  → START_TODAY (email + SMS)
  */
 
 export async function onRequestPost({ request, env }) {
   try {
-    /* -------------------- AUTH -------------------- */
+    /* ============================================================
+     * AUTH
+     * ============================================================ */
     const secret = env.CRON_SHARED_SECRET;
     if (!secret) {
       return json({ ok: false, error: "cron_secret_not_set" }, 500);
@@ -18,11 +29,14 @@ export async function onRequestPost({ request, env }) {
       return json({ ok: false, error: "unauthorized" }, 401);
     }
 
-    /* -------------------- TIME -------------------- */
+    /* ============================================================
+     * TIME (America/Chicago is source of truth)
+     * ============================================================ */
     const now = new Date(
       new Date().toLocaleString("en-US", { timeZone: "America/Chicago" })
     );
-    const day = now.getDay(); // 1=Mon, 5=Fri
+
+    const day = now.getDay(); // 1 = Monday, 5 = Friday
 
     let cronHint = null;
     let mode = null;
@@ -38,54 +52,71 @@ export async function onRequestPost({ request, env }) {
         ok: true,
         cronHint: "NONE",
         message: "Cron takes no action today",
-        now: now.toISOString()
+        triggeredAt: now.toISOString()
       });
     }
 
-    /* -------------------- FIRE NOTIFY -------------------- */
-    const res = await fetch(
-      `${env.PUBLIC_PORTAL_URL}/api/admin/oncall/notify`,
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-cron-secret": secret
-        },
-        body: JSON.stringify({
-          auto: true,
-          cronHint,
-          mode
-        })
-      }
-    );
+    /* ============================================================
+     * FIRE INTERNAL NOTIFY (NO ACCESS PROTECTION)
+     * ============================================================ */
+    const notifyUrl = `${env.PUBLIC_PORTAL_URL}/api/internal/oncall/notify`;
+
+    const res = await fetch(notifyUrl, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-cron-secret": secret
+      },
+      body: JSON.stringify({
+        auto: true,
+        cronHint,
+        mode
+      })
+    });
 
     const text = await res.text();
 
     if (!res.ok) {
-      return json({
-        ok: false,
-        error: "notify_failed",
-        status: res.status,
-        response: text
-      }, 500);
+      return json(
+        {
+          ok: false,
+          error: "notify_failed",
+          status: res.status,
+          response: text
+        },
+        500
+      );
+    }
+
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      parsed = { raw: text };
     }
 
     return json({
       ok: true,
+      triggeredAt: now.toISOString(),
       cronHint,
       mode,
-      notifyResponse: JSON.parse(text)
+      notifyResponse: parsed
     });
 
   } catch (err) {
-    console.error("[cron-http] fatal", err);
+    console.error("[cron-internal] fatal", err);
     return json({ ok: false, error: "internal_error" }, 500);
   }
 }
 
-/* Optional: allow GET for debugging */
+/* ============================================================
+ * Optional GET support (manual testing)
+ * ============================================================ */
 export const onRequestGet = onRequestPost;
 
+/* ============================================================
+ * Helpers
+ * ============================================================ */
 function json(body, status = 200) {
   return new Response(JSON.stringify(body, null, 2), {
     status,
