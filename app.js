@@ -1818,7 +1818,8 @@ if (archivedEntries.length) {
     return true;
   }
 );
-
+return; 
+}      
 
      if (action === "edit") {
   const entry = APP_STATE.draftSchedule?.entries?.find(e => String(e.id) === String(id));
