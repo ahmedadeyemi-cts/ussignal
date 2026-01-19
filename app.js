@@ -900,6 +900,29 @@ function getCurrentOnCallEntry(entries) {
     return now >= s && now < en;
   }) || null;
 }
+/**
+ * Build a DST-safe on-call window from a DATE ONLY (YYYY-MM-DD)
+ * Always:
+ *  - Start: Friday 4:00 PM CST
+ *  - End:   Following Friday 7:00 AM CST
+ */
+function buildBulkOnCallWindow(startYMD) {
+  // Force date only (no time)
+  const start = new Date(`${startYMD}T00:00:00`);
+
+  // Snap to Friday forward if needed
+  const friday = snapToFridayForward(start);
+  friday.setHours(16, 0, 0, 0); // 4:00 PM (wall time intent)
+
+  const end = new Date(friday);
+  end.setDate(end.getDate() + 7);
+  end.setHours(7, 0, 0, 0); // 7:00 AM (wall time intent)
+
+  return {
+    startISO: toLocalInput(friday) + ":00",
+    endISO: toLocalInput(end) + ":00"
+  };
+}
 
 /* =========================
  * Validation
@@ -1255,19 +1278,27 @@ function normalizeScheduleEntriesFromBulk(rows) {
   const map = new Map();
 
   for (const raw of rows || []) {
-  const r = normalizeScheduleUploadRow(raw);
+    const r = normalizeScheduleUploadRow(raw);
 
-  if (!r.startISO || !r.endISO || !r.team) {
-    continue;
-  }
+    // ⛔ Require a DATE, not a timestamp
+    const startDate =
+      r.startISO?.slice(0, 10) ||   // YYYY-MM-DD from ISO
+      r.start?.slice(0, 10);
 
-    const key = `${r.startISO}::${r.endISO}`;
+    if (!startDate || !r.team) {
+      continue;
+    }
+
+    // 🔒 DST-SAFE CANONICAL WINDOW
+    const { startISO, endISO } = buildBulkOnCallWindow(startDate);
+
+    const key = `${startISO}::${endISO}`;
 
     if (!map.has(key)) {
       map.set(key, {
         id: crypto.randomUUID(),
-        startISO: r.startISO,
-        endISO: r.endISO,
+        startISO,
+        endISO,
         departments: {}
       });
     }
@@ -1289,9 +1320,9 @@ function normalizeScheduleEntriesFromBulk(rows) {
         value: r.phone
       });
     }
-  } // ✅ CLOSES for-loop
+  }
 
-  return Array.from(map.values()); // ✅ RETURN OUTSIDE LOOP
+  return Array.from(map.values());
 }
 
 
