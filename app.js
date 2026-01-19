@@ -1857,8 +1857,13 @@ if (action === "notifyEntry") {
     </div>
   `,
   async () => {
-    const force =
-      document.getElementById("forceResendChk")?.checked === true;
+    const alreadyNotified = !!APP_STATE.notifyStatus[id];
+    const force = getForceResendChecked();
+
+    if (alreadyNotified && !force) {
+      toast("Already notified — force resend required", 4000);
+      return false;
+    }
 
     const res = await fetchAuth(`/api/admin/oncall/notify`, {
       method: "POST",
@@ -1874,18 +1879,13 @@ if (action === "notifyEntry") {
 
       if (!res.ok) throw new Error(await res.text());
 
-      APP_STATE.notifyStatus[id] = {
-  email: { sentAt: new Date().toISOString() },
-  sms: Array.isArray(APP_STATE.notifyStatus[id]?.sms)
-    ? APP_STATE.notifyStatus[id].sms
-    : [],
-  by: "admin",
-  auto: false
-};
+    // 🔑 Re-sync from KV (authoritative)
+await loadNotifyStatus();
 
+// 🔑 Re-render from persisted state
+renderScheduleAdmin(el);
 
-      renderScheduleAdmin(el);
-      toast(already ? "Notifications resent." : "Notifications sent.");
+toast(already ? "Notifications resent." : "Notifications sent.");
     }
   );
   return;
@@ -1909,8 +1909,8 @@ if (action === "notifySMS") {
     </div>
   `,
   async () => {
-   const alreadyNotified = !!already;
-const force = getForceResendChecked();
+   const alreadyNotified = !!APP_STATE.notifyStatus[id];
+    const force = getForceResendChecked();
 
 if (alreadyNotified && !force) {
   toast("Already notified — force resend required", 4000);
@@ -1936,7 +1936,7 @@ await loadNotifyStatus();
 // 🔑 Re-render with persisted state
 renderScheduleAdmin(el);
 
-toast("Email notification sent.");
+toast("SMS notification sent.");
     }
   );
   return;
@@ -2627,14 +2627,14 @@ async function sendNotify() {
 
   if (!res.ok) throw new Error(await res.text());
 
-  APP_STATE.notifyStatus[active.id] = {
-    email: { sentAt: new Date().toISOString() },
-    sms: [],
-    by: "admin"
-  };
+  // Re-sync from KV (authoritative)
+await loadNotifyStatus();
 
-  renderScheduleAdmin(byId("schedule"));
-  toast("Notifications sent.");
+// Re-render using persisted state
+renderScheduleAdmin(byId("schedule"));
+
+toast("Email notification sent.");
+
 }
 
 
@@ -3161,15 +3161,9 @@ setInterval(async () => {
           })
         });
 
-        APP_STATE.notifyStatus[e.id] = {
-  email: { sentAt: new Date().toISOString() },
-  sms: [],
-  by: "system",
-  auto: true
-};
+       await loadNotifyStatus();
+              renderScheduleAdmin(byId("schedule"));
 
-
-        renderScheduleAdmin(byId("schedule"));
       } catch (err) {
         console.error("Auto-notify failed", err);
       }
