@@ -21,7 +21,7 @@ export async function onRequest({ request, env }) {
     }
 
     // ✅ CORRECT KV KEY
-    const raw = await env.ONCALL_KV.get("ONCALL:PS_Customer");
+    const raw = await env.ONCALL_KV.get("ONCALL:PS_CUSTOMERS");
     if (!raw) {
       console.warn("[PIN] PS customer KV not found");
       return json({ match: false });
