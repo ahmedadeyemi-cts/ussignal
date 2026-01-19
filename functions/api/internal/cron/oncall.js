@@ -1,37 +1,16 @@
 /**
- * ============================================================
- * INTERNAL CRON — ON-CALL NOTIFICATIONS
- * ============================================================
+ * POST /api/internal/cron/oncall
  *
- * Endpoint:
- *   POST /api/internal/cron/oncall
- *
- * Triggered ONLY by Cloudflare Scheduled Triggers
- *
- * Behavior:
- * - Monday  → UPCOMING on-call reminder (email)
- * - Friday  → START_TODAY notification (email + SMS)
- *
- * Security:
- * - Protected by CRON_SHARED_SECRET
- * - NOT protected by Cloudflare Access (by design)
- *
- * ENV REQUIRED:
- * - CRON_SHARED_SECRET
- * - PUBLIC_PORTAL_URL
- *
- * OPTIONAL:
- * - CRON_DRY_RUN=true
+ * Manual + Cron trigger endpoint
+ * Protected via x-cron-secret
  */
 
 export async function onRequestPost({ request, env }) {
   try {
-    /* --------------------------------------------------------
-     * SECURITY — SHARED SECRET
-     * ------------------------------------------------------ */
+    /* -------------------- AUTH -------------------- */
     const secret = env.CRON_SHARED_SECRET;
     if (!secret) {
-      return json({ ok: false, error: "cron_secret_not_configured" }, 500);
+      return json({ ok: false, error: "cron_secret_not_set" }, 500);
     }
 
     const hdr = request.headers.get("x-cron-secret");
@@ -39,14 +18,11 @@ export async function onRequestPost({ request, env }) {
       return json({ ok: false, error: "unauthorized" }, 401);
     }
 
-    /* --------------------------------------------------------
-     * TIME — CENTRAL TIME (AUTHORITATIVE)
-     * ------------------------------------------------------ */
+    /* -------------------- TIME -------------------- */
     const now = new Date(
       new Date().toLocaleString("en-US", { timeZone: "America/Chicago" })
     );
-
-    const day = now.getDay(); // 1 = Monday, 5 = Friday
+    const day = now.getDay(); // 1=Mon, 5=Fri
 
     let cronHint = null;
     let mode = null;
@@ -66,35 +42,22 @@ export async function onRequestPost({ request, env }) {
       });
     }
 
-    /* --------------------------------------------------------
-     * DRY-RUN SUPPORT
-     * ------------------------------------------------------ */
-    const dryRun =
-      env.CRON_DRY_RUN &&
-      String(env.CRON_DRY_RUN).toLowerCase() === "true";
-
-    /* --------------------------------------------------------
-     * DELEGATE TO EXISTING NOTIFY ENGINE
-     * ------------------------------------------------------ */
-    const payload = {
-      auto: true,
-      cronHint,
-      mode,
-      dryRun
-    };
-
-    const baseUrl = env.PUBLIC_PORTAL_URL;
-    if (!baseUrl) {
-      return json({ ok: false, error: "missing_PUBLIC_PORTAL_URL" }, 500);
-    }
-
-    const res = await fetch(`${baseUrl}/api/admin/oncall/notify`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json"
-      },
-      body: JSON.stringify(payload)
-    });
+    /* -------------------- FIRE NOTIFY -------------------- */
+    const res = await fetch(
+      `${env.PUBLIC_PORTAL_URL}/api/admin/oncall/notify`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-cron-secret": secret
+        },
+        body: JSON.stringify({
+          auto: true,
+          cronHint,
+          mode
+        })
+      }
+    );
 
     const text = await res.text();
 
@@ -107,28 +70,21 @@ export async function onRequestPost({ request, env }) {
       }, 500);
     }
 
-    /* --------------------------------------------------------
-     * SUCCESS
-     * ------------------------------------------------------ */
     return json({
       ok: true,
       cronHint,
       mode,
-      dryRun,
-      triggeredAt: now.toISOString(),
-      notifyResponse: safeJson(text)
+      notifyResponse: JSON.parse(text)
     });
 
   } catch (err) {
-    console.error("[cron-oncall] error", err);
+    console.error("[cron-http] fatal", err);
     return json({ ok: false, error: "internal_error" }, 500);
   }
 }
 
-/* ============================================================
- * HELPERS
- * ============================================================
- */
+/* Optional: allow GET for debugging */
+export const onRequestGet = onRequestPost;
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body, null, 2), {
@@ -138,12 +94,4 @@ function json(body, status = 200) {
       "cache-control": "no-store"
     }
   });
-}
-
-function safeJson(text) {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return text;
-  }
 }
