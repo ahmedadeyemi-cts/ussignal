@@ -8,24 +8,23 @@
 export async function onRequest({ request, env }) {
   try {
     const url = new URL(request.url);
-    const dept = url.searchParams.get("department");
+    const dept =
+      url.searchParams.get("department")?.trim().toLowerCase();
 
     if (!dept) {
       return json({ match: false });
     }
 
-    // Pull authoritative current on-call record
     const raw = await env.ONCALL_KV.get("ONCALL:CURRENT");
     if (!raw) {
-      console.warn("[ONCALLTODAY] ONCALL:CURRENT not found");
+      console.warn("[ONCALLTODAY] ONCALL:CURRENT missing");
       return json({ match: false });
     }
 
     const current = JSON.parse(raw);
-    const departments = current.departments || {};
+    const engineer = current?.departments?.[dept];
 
-    const engineer = departments[dept];
-    if (!engineer) {
+    if (!engineer || !engineer.phone) {
       return json({ match: false });
     }
 
@@ -42,21 +41,8 @@ export async function onRequest({ request, env }) {
         endISO: current.endISO
       }
     });
-
   } catch (err) {
     console.error("[ONCALLTODAY ERROR]", err);
     return json({ match: false });
   }
 }
-
-function json(body, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      "content-type": "application/json",
-      "cache-control": "no-store"
-    }
-  });
-}
-
-export const onRequestGet = onRequest;
