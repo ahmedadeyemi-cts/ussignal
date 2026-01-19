@@ -602,6 +602,19 @@ function confirmModal(title, bodyText, onOk) {
     "Cancel"
   );
 }
+// ✅ HTML-safe confirm modal (does NOT escape body)
+function confirmModalHtml(title, bodyHtml, onOk) {
+  showModal(
+    title,
+    bodyHtml,
+    "Confirm",
+    async () => {
+      const result = await onOk();
+      return result !== false; // returning false keeps modal open
+    },
+    "Cancel"
+  );
+}
 
 function hideModal() {
   const modal = byId("modal");
@@ -615,15 +628,13 @@ function hideModal() {
  * Force Resend Check Helper
  * ========================= */
 function getForceResendChecked() {
-  const chk = document.getElementById("forceResendChk");
+  const scope = document.getElementById("modalBody") || document;
+  const chk = scope.querySelector("#forceResendChk");
 
   if (!chk) {
-    console.warn(
-      "[notify] forceResendChk not found — modal HTML may not have rendered correctly"
-    );
+    console.warn("[notify] forceResendChk not found — modal HTML may not have rendered correctly");
     return false;
   }
-
   return chk.checked === true;
 }
 
@@ -1757,34 +1768,34 @@ if (archivedEntries.length) {
     return;
   }
 
-  confirmModal(
+  confirmModalHtml(
   "Send Email Notification",
   `
-  <div>Send email notification to the on-call user(s) for this week?</div>
+    <div>Send email notification to the on-call user(s) for this week?</div>
 
-  ${
-    APP_STATE.notifyStatus[id]
-      ? `<div class="warning-box" style="margin-top:10px">
-           ⚠️ Already notified — force resend required
-         </div>`
-      : ""
-  }
+    ${
+      APP_STATE.notifyStatus[id]
+        ? `<div class="warning-box" style="margin-top:10px">
+             ⚠️ Already notified — force resend required
+           </div>`
+        : ""
+    }
 
-  <div class="inline-row" style="margin-top:10px">
-    <label>
-      <input type="checkbox" id="forceResendChk" />
-      Force resend even if already notified
-    </label>
-  </div>
-`,
+    <div class="inline-row" style="margin-top:10px">
+      <label>
+        <input type="checkbox" id="forceResendChk" />
+        Force resend even if already notified
+      </label>
+    </div>
+  `,
   async () => {
     const alreadyNotified = !!APP_STATE.notifyStatus[id];
-const force = getForceResendChecked();
+    const force = getForceResendChecked();
 
-if (alreadyNotified && !force) {
-  toast("Already notified — force resend required", 4000);
-  return false; // keep modal open
-}
+    if (alreadyNotified && !force) {
+      toast("Already notified — force resend required", 4000);
+      return false; // keep modal open
+    }
 
     const res = await fetchAuth(`/api/admin/oncall/notify`, {
       method: "POST",
@@ -1798,21 +1809,15 @@ if (alreadyNotified && !force) {
       })
     });
 
-      if (!res.ok) throw new Error(await res.text());
+    if (!res.ok) throw new Error(await res.text());
 
-      // ✅ Persist UI state safely
-      await loadNotifyStatus();
-      renderScheduleAdmin(el);
+    await loadNotifyStatus();
+    renderScheduleAdmin(el);
 
-      toast("Email notification sent.");
-    }
-  );
-  return;
-}
-      if (action === "notifyTimeline") {
-  await openNotifyTimeline(id);
-  return;
-}
+    toast("Email notification sent.");
+    return true;
+  }
+);
 
 
      if (action === "edit") {
