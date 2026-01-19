@@ -13,7 +13,8 @@ console.log("[public] public.js loaded");
 const REFRESH_MS = 60_000;
 const ENDPOINTS = {
   oncall: "/api/oncall",
-  current: "/api/oncall/current"
+  current: "/api/oncall/current",
+  psCustomers: "/api/admin/ps-customers" // READ-ONLY
 };
 
 const DEPT_LABELS = {
@@ -27,6 +28,7 @@ let STATE = {
   entries: [],
   updatedAt: null,
   current: null,
+  psCustomers: [],
   loading: true
 };
 /* =========================
@@ -65,7 +67,11 @@ function wireUI() {
 async function loadAll() {
   const before = LAST_HASH;
 
-  await Promise.allSettled([loadSchedule(), loadCurrent()]);
+  await Promise.allSettled([
+  loadSchedule(),
+  loadCurrent(),
+  loadPsCustomers()
+]);
 
   STATE.loading = false;
 
@@ -141,6 +147,32 @@ async function loadCurrent() {
   STATE.current = entry;
 
   console.log("[public] current loaded:", !!STATE.current);
+}
+/* =========================
+ * OneAssist
+ * ========================= */
+async function loadPsCustomers() {
+  const res = await fetch(ENDPOINTS.psCustomers, { cache: "no-store" });
+  if (!res.ok) {
+    console.warn("[public] ps-customers fetch failed");
+    STATE.psCustomers = [];
+    return;
+  }
+
+  const raw = await res.json();
+
+  // Normalize defensively
+  let customers = [];
+
+  if (Array.isArray(raw)) {
+    customers = raw;
+  } else if (Array.isArray(raw.customers)) {
+    customers = raw.customers;
+  }
+
+  STATE.psCustomers = customers;
+
+  console.log("[public] ps customers loaded:", customers.length);
 }
 
 /* =========================
@@ -221,6 +253,7 @@ function renderAll() {
   renderTimeline();
   renderCurrent();
   renderSchedule();
+  renderPsCustomers();
 }
 
 function showSkeletons() {
@@ -469,6 +502,37 @@ function hashEntries(entries) {
   } catch {
     return String(Math.random());
   }
+}
+
+function renderPsCustomers() {
+  const el = document.getElementById("psCustomers");
+  if (!el) return;
+
+  const list = STATE.psCustomers || [];
+
+  if (!list.length) {
+    el.innerHTML = `<div class="subtle">No Professional Services customers available.</div>`;
+    return;
+  }
+
+  el.innerHTML = `
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Customer</th>
+          <th>PIN</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${list.map(c => `
+          <tr>
+            <td>${escapeHtml(c.name || "—")}</td>
+            <td><code>${escapeHtml(c.pin || "—")}</code></td>
+          </tr>
+        `).join("")}
+      </tbody>
+    </table>
+  `;
 }
 /* =========================
  * Filtering / Sorting
