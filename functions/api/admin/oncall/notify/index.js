@@ -281,54 +281,48 @@ if (env.ADMIN_NOTIFICATION) {
 /* ---------------------------------------------
  * EMAIL
  * --------------------------------------------- */
-if (sendEmail) {
-  // skip already recorded earlier
-} else if (emailTo.length === 0) {
+if (sendEmail && skipEmail) {
+  // Already recorded; skip
+} else if (sendEmail && emailTo.length === 0) {
   skipped.push({
     entryKey,
     channel: "email",
     reason: "no_recipients"
   });
+} else if (sendEmail && dryRun) {
+  skipped.push({
+    entryKey,
+    channel: "email",
+    reason: "dry_run",
+    recipients: emailTo.length,
+    force: !!force
+  });
+} else if (sendEmail) {
+  // ✅ ACTUAL SEND
+  const messageId = await sendBrevoEmail(env, {
+    to: emailTo,
+    subject:
+      notifyType === "UPCOMING"
+        ? "On-Call Reminder – Upcoming Week"
+        : "On-Call Starts Today – Action Required",
+    html: buildEmailHtml(BRAND, entry, tz, notifyType, env.PUBLIC_PORTAL_URL)
+  });
 
-  } else if (dryRun) {
-    skipped.push({
-      entryKey,
-      channel: "email",
-      reason: "dry_run",
-      recipients: emailTo.length
-    });
+  await env.ONCALL_KV.put(
+    emailKey,
+    JSON.stringify({
+      sentAt: new Date().toISOString(),
+      messageId,
+      notifyType,
+      force: !!force,
+      auto: !!auto
+    }),
+    { expirationTtl: 60 * 60 * 24 * 45 }
+  );
 
-  } else {
-    // ✅ ACTUAL SEND
-    const messageId = await sendBrevoEmail(env, {
-      to: emailTo,
-      subject:
-        notifyType === "UPCOMING"
-          ? "On-Call Reminder – Upcoming Week"
-          : "On-Call Starts Today – Action Required",
-      html: buildEmailHtml(
-        BRAND,
-        entry,
-        tz,
-        notifyType,
-        env.PUBLIC_PORTAL_URL
-      )
-    });
-
-    await env.ONCALL_KV.put(
-      emailKey,
-      JSON.stringify({
-        ts: new Date().toISOString(),
-        messageId
-      }),
-      { expirationTtl: 60 * 60 * 24 * 45 }
-    );
-
-    // ✅ COUNT ONE SEND PER ENTRY (not per recipient)
-    emailsSent += 1;
-  }
+  // ✅ COUNT ONE SEND PER ENTRY (not per recipient)
+  emailsSent += 1;
 }
-
 
       /* ---------------------------------------------
        * SMS
@@ -349,10 +343,15 @@ if (sendEmail) {
 
         if (!dryRun) {
           await env.ONCALL_KV.put(
-            smsKey,
-            JSON.stringify({ ts: new Date().toISOString() }),
-            { expirationTtl: 60 * 60 * 24 * 45 }
-          );
+  smsKey,
+  JSON.stringify({
+    sentAt: new Date().toISOString(),
+    notifyType,
+    force: !!force,
+    auto: !!auto
+  }),
+  { expirationTtl: 60 * 60 * 24 * 45 }
+);
         }
       }
 
