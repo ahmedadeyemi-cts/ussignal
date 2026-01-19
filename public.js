@@ -640,21 +640,21 @@ function escapeHtml(s) {
 const timelineEl = document.getElementById("timeline");
 
 if (timelineEl) {
+const timeline = document.getElementById("timeline");
+if (timeline) {
   const obs = new MutationObserver(() => {
-    Array.from(timelineEl.children).forEach((r, i) => {
-      setTimeout(() => r.classList.add("animate-in"), i * 35);
+    Array.from(timeline.children).forEach((r,i)=>{
+      setTimeout(()=>r.classList.add("animate-in"),i*35);
     });
-
     const today =
-      timelineEl.querySelector(".current-week") ||
-      timelineEl.querySelector("[data-current-week='true']");
-
+      timeline.querySelector(".current-week") ||
+      timeline.querySelector("[data-current-week='true']");
     if (today) {
       today.classList.add("today-indicator");
     }
   });
-
-  obs.observe(timelineEl, { childList: true, subtree: true });
+  obs.observe(timeline,{childList:true});
+}
 
   let tsx = 0;
   timelineEl.addEventListener("touchstart", e => {
