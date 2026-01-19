@@ -6,7 +6,7 @@ export async function onRequest(ctx) {
   }
 
   if (request.method === "GET") {
-    const raw = await env.ONCALL_KV.get("PS_CUSTOMERS");
+    const raw = await env.ONCALL_KV.get("ONCALL:PS_CUSTOMERS");
     return json(raw ? JSON.parse(raw) : { customers: [] });
   }
 
