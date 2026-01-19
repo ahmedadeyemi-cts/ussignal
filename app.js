@@ -1577,43 +1577,41 @@ activeEntries.forEach(e => {
                 </div>
 
                 ${
-                  (() => {
   (() => {
-  const n = APP_STATE.notifyStatus[e.id] || {};
+    const n = APP_STATE.notifyStatus[e.id] || {};
 
-  const hasEmail = !!n.email;
-  const hasSMS = !!n.sms;
+    const hasEmail = !!n.email;
+    const hasSMS = !!n.sms;
 
-  const emailForced = n.email?.force === true;
-  const smsForced = n.sms?.force === true;
-  const wasForced = emailForced || smsForced;
+    const emailForced = n.email?.force === true;
+    const smsForced = n.sms?.force === true;
+    const wasForced = emailForced || smsForced;
 
-  if (!hasEmail && !hasSMS) {
-    return `<span class="notify-badge pending">⏳ Pending</span>`;
-  }
+    if (!hasEmail && !hasSMS) {
+      return `<span class="notify-badge pending">⏳ Pending</span>`;
+    }
 
-  return `
-    <div class="notify-badges">
-      ${hasEmail ? `<span class="notify-badge email">📧 Email</span>` : ""}
-      ${hasSMS ? `<span class="notify-badge sms">📱 SMS</span>` : ""}
-      ${hasEmail && hasSMS ? `<span class="notify-badge both">✅ Both</span>` : ""}
+    return `
+      <div class="notify-badges">
+        ${hasEmail ? `<span class="notify-badge email">📧 Email</span>` : ""}
+        ${hasSMS ? `<span class="notify-badge sms">📱 SMS</span>` : ""}
+        ${hasEmail && hasSMS ? `<span class="notify-badge both">✅ Both</span>` : ""}
 
-      ${
-        wasForced
-          ? `<span class="notify-badge forced" title="Notification was force resent">🔁 Forced</span>`
-          : ``
-      }
+        ${
+          wasForced
+            ? `<span class="notify-badge forced" title="Notification was force resent">🔁 Forced</span>`
+            : ``
+        }
 
-      <button class="ghost small"
-        data-action="notifyTimeline"
-        data-id="${escapeHtml(String(e.id))}">
-        🕒 Timeline
-      </button>
-    </div>
-  `;
-})()
-                }
-
+        <button class="ghost small"
+          data-action="notifyTimeline"
+          data-id="${escapeHtml(String(e.id))}">
+          🕒 Timeline
+        </button>
+      </div>
+    `;
+  })()
+}
                 <div class="small subtle">CST</div>
               `
           }
