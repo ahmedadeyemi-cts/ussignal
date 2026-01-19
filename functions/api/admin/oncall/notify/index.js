@@ -540,26 +540,52 @@ function buildEmailHtml(BRAND, entry, tz, type, portal) {
   `;
 }
 async function sendBrevoEmail(env, { to, subject, html }) {
+  // ---------------------------------------------
+  // Resolve reply-to (must be ONE valid email)
+  // ---------------------------------------------
+  const replyToEmail = (() => {
+    const raw =
+      env.BREVO_REPLY_TO ||
+      env.BREVO_SENDER_EMAIL ||
+      "";
+
+    return String(raw)
+      .split(",")
+      .map(e => e.trim())
+      .find(e => e.includes("@")) || null;
+  })();
+
+  // ---------------------------------------------
+  // Build payload
+  // ---------------------------------------------
+  const payload = {
+    sender: {
+      email: env.BREVO_SENDER_EMAIL,
+      name: env.BREVO_SENDER_NAME
+    },
+    to,
+    subject,
+    htmlContent: html,
+    textContent: "On-call notification from US Signal."
+  };
+
+  if (replyToEmail) {
+    payload.replyTo = {
+      email: replyToEmail,
+      name: "On-Call Admin"
+    };
+  }
+
+  // ---------------------------------------------
+  // Send to Brevo
+  // ---------------------------------------------
   const res = await fetch("https://api.brevo.com/v3/smtp/email", {
     method: "POST",
     headers: {
       "content-type": "application/json",
       "api-key": env.BREVO_API_KEY
     },
-    body: JSON.stringify({
-      sender: {
-        email: env.BREVO_SENDER_EMAIL,
-        name: env.BREVO_SENDER_NAME
-      },
-      to,
-      subject,
-      htmlContent: html,
-      textContent: "On-call notification from US Signal.",
-      replyTo: {
-        email: env.ADMIN_NOTIFICATION || env.BREVO_SENDER_EMAIL,
-        name: "On-Call Admin"
-      }
-    })
+    body: JSON.stringify(payload)
   });
 
   const raw = await res.text();
@@ -579,7 +605,7 @@ async function sendBrevoEmail(env, { to, subject, html }) {
     );
   }
 
-  // ✅ IMPORTANT: return Brevo proof
+  // ✅ Return Brevo proof
   return body?.messageId || null;
 }
 
