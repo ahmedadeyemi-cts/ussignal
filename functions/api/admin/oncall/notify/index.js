@@ -253,14 +253,27 @@ if (env.ADMIN_NOTIFICATION && env.ADMIN_NOTIFICATION.includes("@")) {
         }
       }
 
-      /* ---------------------------------------------
-       * EMAIL
-       * --------------------------------------------- */
-if (sendEmail && !skipEmail) {
-  if (emailTo.length === 0) {
+/* ---------------------------------------------
+ * EMAIL
+ * --------------------------------------------- */
+if (sendEmail) {
+  if (skipEmail) {
+    skipped.push({ entryKey, channel: "email", reason: "dedupe" });
+
+  } else if (emailTo.length === 0) {
     skipped.push({ entryKey, channel: "email", reason: "no_recipients" });
-  } else if (!dryRun) {
-    await sendBrevoEmail(env, {
+
+  } else if (dryRun) {
+    skipped.push({
+      entryKey,
+      channel: "email",
+      reason: "dry_run",
+      recipients: emailTo.length
+    });
+
+  } else {
+    // ✅ ACTUAL SEND
+    const messageId = await sendBrevoEmail(env, {
       to: emailTo,
       subject:
         notifyType === "UPCOMING"
@@ -277,13 +290,18 @@ if (sendEmail && !skipEmail) {
 
     await env.ONCALL_KV.put(
       emailKey,
-      JSON.stringify({ ts: new Date().toISOString() }),
+      JSON.stringify({
+        ts: new Date().toISOString(),
+        messageId
+      }),
       { expirationTtl: 60 * 60 * 24 * 45 }
     );
-  }
 
-  emailsSent += emailTo.length;
+    // ✅ COUNT ONE SEND PER ENTRY (not per recipient)
+    emailsSent += 1;
+  }
 }
+
 
       /* ---------------------------------------------
        * SMS
@@ -339,12 +357,17 @@ if (sendEmail && !skipEmail) {
     //** });
 
     return json({
-      ok: true,
-      dryRun,
-      emailsSent,
-      smsSent,
-      skipped
-    });
+  ok: emailsSent > 0 || smsSent > 0,
+  dryRun,
+  emailsSent,
+  smsSent,
+  skipped,
+  note:
+    emailsSent === 0 && sendEmail
+      ? "No emails sent. Check skipped[] for reasons."
+      : undefined
+});
+    
   } catch (err) {
     console.error("NOTIFY ERROR", err);
     return json({ error: err.message }, 500);
@@ -513,23 +536,26 @@ async function sendBrevoEmail(env, { to, subject, html }) {
     })
   });
 
- const raw = await res.text();
-let body;
+  const raw = await res.text();
+  let body;
 
-try {
-  body = JSON.parse(raw);
-} catch {
-  body = raw;
-}
-
-if (!res.ok) {
-  throw new Error(
-    `Brevo email failed ${res.status}: ${
-      typeof body === "string" ? body : JSON.stringify(body)
-    }`
-  );
-}
+  try {
+    body = JSON.parse(raw);
+  } catch {
+    body = raw;
   }
+
+  if (!res.ok) {
+    throw new Error(
+      `Brevo email failed ${res.status}: ${
+        typeof body === "string" ? body : JSON.stringify(body)
+      }`
+    );
+  }
+
+  // ✅ IMPORTANT: return Brevo proof
+  return body?.messageId || null;
+}
 
 async function sendBrevoSms(env, { to, message }) {
   const res = await fetch("https://api.brevo.com/v3/transactionalSMS/send", {
