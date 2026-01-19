@@ -1,2 +1,3 @@
-[triggers]
-crons = ["*/10 * * * *"]
+[[kv_namespaces]]
+binding = "ONCALL_KV"
+id = "ONCALL:PS_CUSTOMERS"
