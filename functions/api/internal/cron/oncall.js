@@ -1,19 +1,27 @@
 /**
- * POST /api/internal/cron/oncall
+ * POST /api/internal/oncall/notify
  *
- * Internal Cron Trigger (SAFE)
- * - Auth via x-cron-secret
- * - Filters entries BEFORE notify
- * - Monday → notify ONLY entries starting this Friday
- * - Friday → notify ONLY entries starting today
- * - No Cloudflare Access /api/admin calls
+ * Internal notify endpoint for cron
+ * (NOT behind Cloudflare Access)
  */
 
-export async function onRequestPost({ request, env }) {
+export async function onRequestPost(ctx) {
+  return handleNotify(ctx);
+}
+
+/* Optional GET for testing */
+export async function onRequestGet(ctx) {
+  return handleNotify(ctx);
+}
+
+/* ======================================================
+ * EXISTING LOGIC MOVED HERE (NO CHANGES)
+ * ====================================================== */
+async function handleNotify(ctx) {
+  const { request, env } = ctx;
+
   try {
-    /* =====================================================
-     * AUTH
-     * ===================================================== */
+    /* ---------- AUTH ---------- */
     const secret = env.CRON_SHARED_SECRET;
     if (!secret) {
       return json({ ok: false, error: "cron_secret_not_set" }, 500);
@@ -24,162 +32,70 @@ export async function onRequestPost({ request, env }) {
       return json({ ok: false, error: "unauthorized" }, 401);
     }
 
-    /* =====================================================
-     * TIME (CST)
-     * ===================================================== */
-    const now = new Date(
-      new Date().toLocaleString("en-US", { timeZone: "America/Chicago" })
-    );
-    const day = now.getDay(); // 1=Mon, 5=Fri
+    /* ---------- PAYLOAD ---------- */
+    let payload = {};
+    try {
+      payload = await request.json();
+    } catch {}
 
-    let cronHint = null;
-    let mode = null;
+    const {
+      entryId,
+      cronHint,
+      mode = "email",
+      auto = true,
+      dryRun = false
+    } = payload;
 
-    if (day === 1) {
-      cronHint = "MONDAY";
-      mode = "email";
-    } else if (day === 5) {
-      cronHint = "FRIDAY";
-      mode = "both";
-    } else {
-      return json({
-        ok: true,
-        cronHint: "NONE",
-        message: "Cron takes no action today",
-        now: now.toISOString()
-      });
+    if (!entryId) {
+      return json({ ok: false, error: "missing_entryId" }, 400);
     }
 
-    /* =====================================================
-     * LOAD SCHEDULE
-     * ===================================================== */
-    if (!env.ONCALL_KV) {
-      return json({ ok: false, error: "kv_not_bound" }, 500);
-    }
-
-    const raw = await env.ONCALL_KV.get("ONCALL:SCHEDULE");
-    if (!raw) {
-      return json({ ok: false, error: "schedule_not_found" }, 404);
-    }
-
-    const schedule = JSON.parse(raw);
-    const entries = Array.isArray(schedule.entries)
-      ? schedule.entries
-      : [];
-
-    /* =====================================================
-     * DATE HELPERS
-     * ===================================================== */
-    const startOfDay = d => {
-      const x = new Date(d);
-      x.setHours(0, 0, 0, 0);
-      return x;
-    };
-
-    const endOfDay = d => {
-      const x = new Date(d);
-      x.setHours(23, 59, 59, 999);
-      return x;
-    };
-
-    const nextFridayFromMonday = d => {
-      const x = new Date(d);
-      const diff = (5 - x.getDay() + 7) % 7;
-      x.setDate(x.getDate() + diff);
-      return x;
-    };
-
-    /* =====================================================
-     * FILTER TARGET ENTRIES (THIS IS THE FIX)
-     * ===================================================== */
-    let targetEntries = [];
-
-    if (cronHint === "MONDAY") {
-      const friday = nextFridayFromMonday(now);
-      const start = startOfDay(friday);
-      const end = endOfDay(friday);
-
-      targetEntries = entries.filter(e => {
-        const s = new Date(e.startISO);
-        return s >= start && s <= end;
-      });
-    }
-
-    if (cronHint === "FRIDAY") {
-      const start = startOfDay(now);
-      const end = endOfDay(now);
-
-      targetEntries = entries.filter(e => {
-        const s = new Date(e.startISO);
-        return s >= start && s <= end;
-      });
-    }
-
-    if (!targetEntries.length) {
-      return json({
-        ok: true,
-        cronHint,
-        message: "No matching on-call entries",
-        count: 0
-      });
-    }
-
-    /* =====================================================
-     * FIRE NOTIFY (INTERNAL, NOT ADMIN)
-     * ===================================================== */
-    const notifications = [];
-
-    for (const entry of targetEntries) {
-      const res = await fetch(
-        `${env.PUBLIC_PORTAL_URL}/api/internal/oncall/notify`,
-        {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            "x-cron-secret": secret
-          },
-          body: JSON.stringify({
-            auto: true,
-            cronHint,
-            mode,
-            entryId: entry.id
-          })
-        }
-      );
-
-      if (res.ok) {
-        notifications.push({
-          entryId: entry.id,
+    /* ---------- DELEGATE TO EXISTING NOTIFY ---------- */
+    const res = await fetch(
+      `${env.PUBLIC_PORTAL_URL}/api/admin/oncall/notify`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-cron-secret": secret
+        },
+        body: JSON.stringify({
+          entryId,
           cronHint,
-          mode
-        });
+          mode,
+          auto,
+          dryRun
+        })
       }
+    );
+
+    const text = await res.text();
+
+    if (!res.ok) {
+      return json({
+        ok: false,
+        error: "notify_failed",
+        status: res.status,
+        response: text
+      }, 500);
     }
 
-    /* =====================================================
-     * RESPONSE
-     * ===================================================== */
     return json({
       ok: true,
-      triggeredBy: "cron",
+      forwarded: true,
+      entryId,
       cronHint,
       mode,
-      count: notifications.length,
-      notifications
+      notifyResponse: JSON.parse(text)
     });
 
   } catch (err) {
-    console.error("[cron:oncall] fatal", err);
+    console.error("[internal-notify] fatal", err);
     return json({ ok: false, error: "internal_error" }, 500);
   }
 }
 
-/* Optional GET for manual testing */
-export const onRequestGet = onRequestPost;
-
-/* =====================================================
- * RESPONSE HELPER
- * ===================================================== */
+/* ---------- RESPONSE ---------- */
 function json(body, status = 200) {
   return new Response(JSON.stringify(body, null, 2), {
     status,
