@@ -1,27 +1,13 @@
 /**
- * POST /api/internal/oncall/notify
+ * POST /api/internal/cron/oncall
  *
- * Internal notify endpoint for cron
- * (NOT behind Cloudflare Access)
+ * Cron + manual trigger
+ * Protected via x-cron-secret
  */
 
-export async function onRequestPost(ctx) {
-  return handleNotify(ctx);
-}
-
-/* Optional GET for testing */
-export async function onRequestGet(ctx) {
-  return handleNotify(ctx);
-}
-
-/* ======================================================
- * EXISTING LOGIC MOVED HERE (NO CHANGES)
- * ====================================================== */
-async function handleNotify(ctx) {
-  const { request, env } = ctx;
-
+export async function onRequest({ request, env }) {
   try {
-    /* ---------- AUTH ---------- */
+    /* ---------------- AUTH ---------------- */
     const secret = env.CRON_SHARED_SECRET;
     if (!secret) {
       return json({ ok: false, error: "cron_secret_not_set" }, 500);
@@ -32,27 +18,33 @@ async function handleNotify(ctx) {
       return json({ ok: false, error: "unauthorized" }, 401);
     }
 
-    /* ---------- PAYLOAD ---------- */
-    let payload = {};
-    try {
-      payload = await request.json();
-    } catch {}
+    /* ---------------- TIME ---------------- */
+    const now = new Date(
+      new Date().toLocaleString("en-US", { timeZone: "America/Chicago" })
+    );
 
-    const {
-      entryId,
-      cronHint,
-      mode = "email",
-      auto = true,
-      dryRun = false
-    } = payload;
+    const day = now.getDay(); // 1=Mon, 5=Fri
+    let cronHint = null;
+    let mode = null;
 
-    if (!entryId) {
-      return json({ ok: false, error: "missing_entryId" }, 400);
+    if (day === 1) {
+      cronHint = "MONDAY";
+      mode = "email";
+    } else if (day === 5) {
+      cronHint = "FRIDAY";
+      mode = "both";
+    } else {
+      return json({
+        ok: true,
+        cronHint: "NONE",
+        message: "No cron action today",
+        now: now.toISOString()
+      });
     }
 
-    /* ---------- DELEGATE TO EXISTING NOTIFY ---------- */
+    /* ---------------- CALL INTERNAL ENGINE ---------------- */
     const res = await fetch(
-      `${env.PUBLIC_PORTAL_URL}/api/admin/oncall/notify`,
+      `${env.PUBLIC_PORTAL_URL}/api/internal/oncall/notify`,
       {
         method: "POST",
         headers: {
@@ -60,42 +52,39 @@ async function handleNotify(ctx) {
           "x-cron-secret": secret
         },
         body: JSON.stringify({
-          entryId,
+          auto: true,
           cronHint,
-          mode,
-          auto,
-          dryRun
+          mode
         })
       }
     );
 
     const text = await res.text();
 
-    if (!res.ok) {
-      return json({
-        ok: false,
-        error: "notify_failed",
-        status: res.status,
-        response: text
-      }, 500);
-    }
-
     return json({
-      ok: true,
-      forwarded: true,
-      entryId,
+      ok: res.ok,
+      status: res.status,
       cronHint,
       mode,
-      notifyResponse: JSON.parse(text)
+      response: safeJSON(text)
     });
 
   } catch (err) {
-    console.error("[internal-notify] fatal", err);
+    console.error("[cron:oncall] fatal", err);
     return json({ ok: false, error: "internal_error" }, 500);
   }
 }
 
-/* ---------- RESPONSE ---------- */
+/* ---------------- HELPERS ---------------- */
+
+function safeJSON(text) {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
 function json(body, status = 200) {
   return new Response(JSON.stringify(body, null, 2), {
     status,
