@@ -40,15 +40,17 @@ export async function onRequest({ request, env }) {
       }, 404);
     }
 
-    return json({
-      ok: true,
-      department,
-      oncall: {
-        name: dept.name,
-        email: dept.email,
-        phone: dept.phone
-      }
-    });
+   const normalizedPhone = String(dept.phone || "").replace(/^\+/, "");
+
+return json({
+  ok: true,
+  department,
+  oncall: {
+    name: dept.name,
+    email: dept.email,
+    phone: normalizedPhone
+  }
+});
 
   } catch (err) {
     console.error("[oncalltoday] fatal", err);
