@@ -1,24 +1,19 @@
 /**
  * POST /api/internal/cron/oncall
  *
- * Internal cron + manual trigger endpoint
- * - Used by Cloudflare Scheduled Triggers
- * - Can be manually invoked via Postman
- * - NEVER touches /api/admin/*
- *
- * Security:
- * - Protected by x-cron-secret
- *
- * Behavior:
- * - Monday  → UPCOMING (email only)
- * - Friday  → START_TODAY (email + SMS)
+ * Internal Cron Trigger (SAFE)
+ * - Auth via x-cron-secret
+ * - Filters entries BEFORE notify
+ * - Monday → notify ONLY entries starting this Friday
+ * - Friday → notify ONLY entries starting today
+ * - No Cloudflare Access /api/admin calls
  */
 
 export async function onRequestPost({ request, env }) {
   try {
-    /* ============================================================
+    /* =====================================================
      * AUTH
-     * ============================================================ */
+     * ===================================================== */
     const secret = env.CRON_SHARED_SECRET;
     if (!secret) {
       return json({ ok: false, error: "cron_secret_not_set" }, 500);
@@ -29,14 +24,13 @@ export async function onRequestPost({ request, env }) {
       return json({ ok: false, error: "unauthorized" }, 401);
     }
 
-    /* ============================================================
-     * TIME (America/Chicago is source of truth)
-     * ============================================================ */
+    /* =====================================================
+     * TIME (CST)
+     * ===================================================== */
     const now = new Date(
       new Date().toLocaleString("en-US", { timeZone: "America/Chicago" })
     );
-
-    const day = now.getDay(); // 1 = Monday, 5 = Friday
+    const day = now.getDay(); // 1=Mon, 5=Fri
 
     let cronHint = null;
     let mode = null;
@@ -52,71 +46,140 @@ export async function onRequestPost({ request, env }) {
         ok: true,
         cronHint: "NONE",
         message: "Cron takes no action today",
-        triggeredAt: now.toISOString()
+        now: now.toISOString()
       });
     }
 
-    /* ============================================================
-     * FIRE INTERNAL NOTIFY (NO ACCESS PROTECTION)
-     * ============================================================ */
-    const notifyUrl = `${env.PUBLIC_PORTAL_URL}/api/internal/oncall/notify`;
+    /* =====================================================
+     * LOAD SCHEDULE
+     * ===================================================== */
+    if (!env.ONCALL_KV) {
+      return json({ ok: false, error: "kv_not_bound" }, 500);
+    }
 
-    const res = await fetch(notifyUrl, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-cron-secret": secret
-      },
-      body: JSON.stringify({
-        auto: true,
+    const raw = await env.ONCALL_KV.get("ONCALL:SCHEDULE");
+    if (!raw) {
+      return json({ ok: false, error: "schedule_not_found" }, 404);
+    }
+
+    const schedule = JSON.parse(raw);
+    const entries = Array.isArray(schedule.entries)
+      ? schedule.entries
+      : [];
+
+    /* =====================================================
+     * DATE HELPERS
+     * ===================================================== */
+    const startOfDay = d => {
+      const x = new Date(d);
+      x.setHours(0, 0, 0, 0);
+      return x;
+    };
+
+    const endOfDay = d => {
+      const x = new Date(d);
+      x.setHours(23, 59, 59, 999);
+      return x;
+    };
+
+    const nextFridayFromMonday = d => {
+      const x = new Date(d);
+      const diff = (5 - x.getDay() + 7) % 7;
+      x.setDate(x.getDate() + diff);
+      return x;
+    };
+
+    /* =====================================================
+     * FILTER TARGET ENTRIES (THIS IS THE FIX)
+     * ===================================================== */
+    let targetEntries = [];
+
+    if (cronHint === "MONDAY") {
+      const friday = nextFridayFromMonday(now);
+      const start = startOfDay(friday);
+      const end = endOfDay(friday);
+
+      targetEntries = entries.filter(e => {
+        const s = new Date(e.startISO);
+        return s >= start && s <= end;
+      });
+    }
+
+    if (cronHint === "FRIDAY") {
+      const start = startOfDay(now);
+      const end = endOfDay(now);
+
+      targetEntries = entries.filter(e => {
+        const s = new Date(e.startISO);
+        return s >= start && s <= end;
+      });
+    }
+
+    if (!targetEntries.length) {
+      return json({
+        ok: true,
         cronHint,
-        mode
-      })
-    });
+        message: "No matching on-call entries",
+        count: 0
+      });
+    }
 
-    const text = await res.text();
+    /* =====================================================
+     * FIRE NOTIFY (INTERNAL, NOT ADMIN)
+     * ===================================================== */
+    const notifications = [];
 
-    if (!res.ok) {
-      return json(
+    for (const entry of targetEntries) {
+      const res = await fetch(
+        `${env.PUBLIC_PORTAL_URL}/api/internal/oncall/notify`,
         {
-          ok: false,
-          error: "notify_failed",
-          status: res.status,
-          response: text
-        },
-        500
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-cron-secret": secret
+          },
+          body: JSON.stringify({
+            auto: true,
+            cronHint,
+            mode,
+            entryId: entry.id
+          })
+        }
       );
+
+      if (res.ok) {
+        notifications.push({
+          entryId: entry.id,
+          cronHint,
+          mode
+        });
+      }
     }
 
-    let parsed;
-    try {
-      parsed = JSON.parse(text);
-    } catch {
-      parsed = { raw: text };
-    }
-
+    /* =====================================================
+     * RESPONSE
+     * ===================================================== */
     return json({
       ok: true,
-      triggeredAt: now.toISOString(),
+      triggeredBy: "cron",
       cronHint,
       mode,
-      notifyResponse: parsed
+      count: notifications.length,
+      notifications
     });
 
   } catch (err) {
-    console.error("[cron-internal] fatal", err);
+    console.error("[cron:oncall] fatal", err);
     return json({ ok: false, error: "internal_error" }, 500);
   }
 }
 
-/* ============================================================
- * Optional GET support (manual testing)
- * ============================================================ */
+/* Optional GET for manual testing */
 export const onRequestGet = onRequestPost;
 
-/* ============================================================
- * Helpers
- * ============================================================ */
+/* =====================================================
+ * RESPONSE HELPER
+ * ===================================================== */
 function json(body, status = 200) {
   return new Response(JSON.stringify(body, null, 2), {
     status,
