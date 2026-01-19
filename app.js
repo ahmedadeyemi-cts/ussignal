@@ -1237,7 +1237,6 @@ function normalizeScheduleResponse(raw) {
 /* =========================
  * Client-Side Normalization (Bulk Upload Input)
  * ========================= */
-
 function normalizeScheduleEntriesFromBulk(rows) {
   const map = new Map();
 
@@ -1259,23 +1258,25 @@ function normalizeScheduleEntriesFromBulk(rows) {
 
     const normalizedPhone = normalizePhoneE164(r.phone);
 
-entry.departments[r.team] = {
-  name: (r.name || "").trim(),
-  email: (r.email || "").trim(),
-  phone: normalizedPhone || ""
-};
+    entry.departments[r.team] = {
+      name: (r.name || "").trim(),
+      email: (r.email || "").trim(),
+      phone: normalizedPhone || ""
+    };
 
-if (!normalizedPhone && r.phone) {
-  entry._phoneWarnings ||= [];
-  entry._phoneWarnings.push({
-    team: r.team,
-    value: r.phone
-  });
+    if (!normalizedPhone && r.phone) {
+      entry._phoneWarnings ||= [];
+      entry._phoneWarnings.push({
+        team: r.team,
+        value: r.phone
+      });
+    }
+  } // ✅ CLOSES for-loop
+
+  return Array.from(map.values()); // ✅ RETURN OUTSIDE LOOP
 }
 
 
-  return Array.from(map.values());
-}
 function wireScheduleBulkUpload() {
   const input = byId("scheduleUploadInput");
   if (!input) return;
