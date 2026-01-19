@@ -378,8 +378,8 @@ if (!APP_STATE.publicMode) {
     savePsCustomers
   ));
   onClick("psReloadCustomersBtn", loadPsCustomers);
-  onClick("psDownloadCsvBtn", downloadPsCustomersCSV);
-  onClick("psDownloadIvrBtn", downloadPsCustomersIVRCSV);
+//  onClick("psDownloadCsvBtn", downloadPsCustomersCSV);
+//  onClick("psDownloadIvrBtn", downloadPsCustomersIVRCSV);
 
     // =========================
   // FINALIZE UI FIRST (SAFE)
@@ -1799,7 +1799,6 @@ el.querySelectorAll("select[data-field='email']").forEach(sel => {
 /* =========================
  * PS Customers (Professional Services)
  * ========================= */
-
 async function loadPsCustomers() {
   const el = byId("psCustomers");
   if (!el) return;
@@ -1813,36 +1812,29 @@ async function loadPsCustomers() {
   }
 
   const raw = await res.json();
+  console.log("[ps] /api/admin/ps-customers raw:", raw);
 
-  // ─────────────────────────────────────────────
-  // 🔑 NORMALIZE ALL POSSIBLE KV SHAPES
-  // ─────────────────────────────────────────────
-  let container =
-    raw?.customers ??
-    raw?.value ??
-    raw;
+  let data = raw;
 
-  // If stringified JSON
-  if (typeof container === "string") {
-    try { container = JSON.parse(container); } catch { container = {}; }
+  if (typeof data === "string") {
+    try { data = JSON.parse(data); } catch { data = null; }
   }
 
-  let customers = container?.customers ?? container;
-
-  // If string again (nested KV)
-  if (typeof customers === "string") {
-    try { customers = JSON.parse(customers); } catch { customers = []; }
+  if (data && typeof data === "object" && !Array.isArray(data)) {
+    data = data.customers ?? data.value ?? data;
   }
 
-  // OBJECT → ARRAY (THIS WAS MISSING)
-  if (customers && typeof customers === "object" && !Array.isArray(customers)) {
-    customers = Object.values(customers);
+  if (typeof data === "string") {
+    try { data = JSON.parse(data); } catch { data = null; }
   }
 
-  if (!Array.isArray(customers)) customers = [];
+  if (data && typeof data === "object" && !Array.isArray(data)) {
+    data = Object.values(data);
+  }
 
-  APP_STATE.psCustomers = customers;
+  if (!Array.isArray(data)) data = [];
 
+  APP_STATE.psCustomers = data;
   renderPsCustomers();
 }
 
@@ -1853,11 +1845,15 @@ function renderPsCustomers() {
   const search =
     byId("psCustomerSearch")?.value.trim().toLowerCase() || "";
 
-  const list = (APP_STATE.psCustomers || []).filter(c =>
-    !search ||
-    c.name?.toLowerCase().includes(search) ||
-    c.pin?.includes(search)
-  );
+  // IMPORTANT: keep original indexes
+  const source = APP_STATE.psCustomers || [];
+  const list = source
+    .map((c, originalIdx) => ({ c, originalIdx }))
+    .filter(({ c }) =>
+      !search ||
+      (c.name || "").toLowerCase().includes(search) ||
+      String(c.pin || "").includes(search)
+    );
 
   el.innerHTML = `
     <table class="roster-table">
@@ -1870,12 +1866,12 @@ function renderPsCustomers() {
         </tr>
       </thead>
       <tbody>
-        ${list.map((c, idx) => `
+        ${list.map(({ c, originalIdx }) => `
           <tr>
             <td>
               <input
                 data-ps="1"
-                data-idx="${idx}"
+                data-idx="${originalIdx}"
                 data-field="name"
                 value="${escapeHtml(c.name || "")}"
               />
@@ -1883,7 +1879,7 @@ function renderPsCustomers() {
             <td>
               <input
                 data-ps="1"
-                data-idx="${idx}"
+                data-idx="${originalIdx}"
                 data-field="pin"
                 maxlength="5"
                 pattern="\\d{5}"
@@ -1891,13 +1887,13 @@ function renderPsCustomers() {
               />
             </td>
             <td class="small subtle">
-              ${escapeHtml(c.id)}
+              ${escapeHtml(c.id || "")}
             </td>
             <td>
               <button
                 class="iconbtn"
                 data-ps-remove="1"
-                data-idx="${idx}"
+                data-idx="${originalIdx}"
                 title="Remove"
               >🗑</button>
             </td>
@@ -1945,7 +1941,6 @@ function renderPsCustomers() {
     };
   });
 }
-
 function psAddCustomerModal() {
   showModal(
     "Add PS Customer",
