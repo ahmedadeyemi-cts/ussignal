@@ -515,7 +515,7 @@ function renderPsCustomers() {
     <div class="ps-card">
       <div class="ps-card-head">
         <div>
-          <h3>Professional Services Customers</h3>
+          <h3>OneAssist Customers</h3>
           <div class="subtle">Read-only reference · Used for IVR and SMS authentication</div>
         </div>
         <input
