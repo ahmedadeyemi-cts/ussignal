@@ -14,7 +14,7 @@ const REFRESH_MS = 60_000;
 const ENDPOINTS = {
   oncall: "/api/oncall",
   current: "/api/oncall/current",
-  psCustomers: "/api/admin/ps-customers" // READ-ONLY
+  psCustomers: "/api/ps-customers"
 };
 
 const DEPT_LABELS = {
@@ -68,10 +68,10 @@ async function loadAll() {
   const before = LAST_HASH;
 
   await Promise.allSettled([
-  loadSchedule(),
-  loadCurrent(),
-  loadPsCustomers()
-]);
+    loadSchedule(),
+    loadCurrent(),
+    loadPsCustomers()
+  ]);
 
   STATE.loading = false;
 
@@ -80,6 +80,7 @@ async function loadAll() {
   } else {
     renderLastUpdated();
     renderCurrent();
+    renderPsCustomers(); // ✅ ADD THIS LINE
   }
 }
 function isArchived(entry) {
@@ -633,4 +634,41 @@ function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, c =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#039;" }[c])
   );
+// =========================
+// SAFETY: Guard timeline observers (prevents JS crash)
+// =========================
+const timelineEl = document.getElementById("timeline");
+
+if (timelineEl) {
+  const obs = new MutationObserver(() => {
+    Array.from(timelineEl.children).forEach((r, i) => {
+      setTimeout(() => r.classList.add("animate-in"), i * 35);
+    });
+
+    const today =
+      timelineEl.querySelector(".current-week") ||
+      timelineEl.querySelector("[data-current-week='true']");
+
+    if (today) {
+      today.classList.add("today-indicator");
+    }
+  });
+
+  obs.observe(timelineEl, { childList: true, subtree: true });
+
+  let tsx = 0;
+  timelineEl.addEventListener("touchstart", e => {
+    tsx = e.touches[0].clientX;
+  }, { passive: true });
+
+  timelineEl.addEventListener("touchend", e => {
+    const dx = e.changedTouches[0].clientX - tsx;
+    if (Math.abs(dx) > 80) {
+      timelineEl.dispatchEvent(
+        new CustomEvent(dx < 0 ? "timeline:next" : "timeline:prev")
+      );
+    }
+  });
+}
+
 }
