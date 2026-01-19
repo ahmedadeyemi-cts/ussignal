@@ -95,12 +95,14 @@ export async function onRequest(ctx) {
     }
 
     const {
-      mode = "both",
-      entryId = null,
-      auto = false,
-      cronHint = null,
-      dryRun = false
-    } = payload;
+  mode = "both",
+  entryId = null,
+  auto = false,
+  cronHint = null,
+  dryRun = false,
+  force = false
+} = payload;
+
 
     const sendEmail = mode === "both" || mode === "email";
     const sendSMS = mode === "both" || mode === "sms";
@@ -214,11 +216,26 @@ export async function onRequest(ctx) {
       const emailKey = `${CFG.kv.notifyPrefix}${entryKey}:email:${notifyType}`;
       const smsKey = `${CFG.kv.notifyPrefix}${entryKey}:sms:${notifyType}`;
 
-    const skipEmail = sendEmail && !!(await env.ONCALL_KV.get(emailKey));
-const skipSms = sendSMS && !!(await env.ONCALL_KV.get(smsKey));
+    const skipEmail =
+  sendEmail &&
+  !force &&
+  !!(await env.ONCALL_KV.get(emailKey));
+
+const skipSms =
+  sendSMS &&
+  !force &&
+  !!(await env.ONCALL_KV.get(smsKey));
 
 if (skipEmail) {
-  skipped.push({ entryKey, channel: "email", reason: "dedupe" });
+//  skipped.push({ entryKey, channel: "email", reason: "dedupe" });
+  if (skipEmail) {
+  skipped.push({
+    entryKey,
+    channel: "email",
+    reason: force ? "forced_bypass_failed" : "dedupe"
+  });
+}
+
 }
 if (skipSms) {
   skipped.push({ entryKey, channel: "sms", reason: "dedupe" });
@@ -229,12 +246,19 @@ if (skipSms) {
        * --------------------------------------------- */
       const emailTo = [];
 
-// 🔔 Always include admin notification
-if (env.ADMIN_NOTIFICATION && env.ADMIN_NOTIFICATION.includes("@")) {
-  emailTo.push({
-    email: env.ADMIN_NOTIFICATION,
-    name: "On-Call Admin"
-  });
+// 🔔 Always include admin notification(s)
+if (env.ADMIN_NOTIFICATION) {
+  const admins = String(env.ADMIN_NOTIFICATION)
+    .split(",")
+    .map(e => e.trim())
+    .filter(e => e.includes("@"));
+
+  for (const email of admins) {
+    emailTo.push({
+      email,
+      name: "On-Call Admin"
+    });
+  }
 }
       const smsTo = [];
 
@@ -258,7 +282,12 @@ if (env.ADMIN_NOTIFICATION && env.ADMIN_NOTIFICATION.includes("@")) {
  * --------------------------------------------- */
 if (sendEmail) {
   if (skipEmail) {
-    skipped.push({ entryKey, channel: "email", reason: "dedupe" });
+    skipped.push({
+    entryKey,
+    channel: "email",
+    reason: force ? "forced_bypass_failed" : "dedupe"
+  });
+}
 
   } else if (emailTo.length === 0) {
     skipped.push({ entryKey, channel: "email", reason: "no_recipients" });
