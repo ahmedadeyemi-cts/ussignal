@@ -6,13 +6,16 @@ compatibility_date = "2024-01-01"
 CRON_SHARED_SECRET = "7Seals^C"
 
 [[triggers.cron]]
-cron = "0 13 * * 1"
+cron = "0 0 * * *"
 
-[[triggers.cron]]
-cron = "0 13 * * 2"
+#[[triggers.cron]]
+#cron = "0 13 * * 1"
 
-[[triggers.cron]]
-cron = "0 13 * * 5"
+#[[triggers.cron]]
+#cron = "0 13 * * 2"
+
+#[[triggers.cron]]
+#cron = "0 13 * * 5"
 
 
 
