@@ -51,7 +51,8 @@ export async function onRequest({ env }) {
     }
 
     cursor = page.cursor;
-    if (!page.list_complete) break;
+    //if (!page.list_complete) break;
+    if (page.list_complete) break;
   }
 
   return new Response(JSON.stringify(status), {
