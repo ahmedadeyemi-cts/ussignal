@@ -7,28 +7,31 @@
 
 export async function onRequest({ request, env }) {
   try {
+    if (!env.ONCALL_KV) {
+      console.error("[oncalltoday] ONCALL_KV binding missing");
+      return json({ ok: false, error: "kv_not_bound" }, 500);
+    }
+
     const url = new URL(request.url);
     const department = url.searchParams.get("department");
 
     if (!department) {
-      return json({
-        ok: false,
-        error: "missing_department"
-      }, 400);
+      return json({ ok: false, error: "missing_department" }, 400);
     }
 
-    // Load current on-call snapshot
     const raw = await env.ONCALL_KV.get("ONCALL:CURRENT");
     if (!raw) {
-      return json({
-        ok: false,
-        error: "oncall_not_available"
-      }, 404);
+      return json({ ok: false, error: "oncall_not_available" }, 404);
     }
 
-    const current = JSON.parse(raw);
-    const dept = current.departments?.[department];
+    let current;
+    try {
+      current = JSON.parse(raw);
+    } catch {
+      return json({ ok: false, error: "invalid_kv_payload" }, 500);
+    }
 
+    const dept = current.departments?.[department];
     if (!dept) {
       return json({
         ok: false,
@@ -48,11 +51,8 @@ export async function onRequest({ request, env }) {
     });
 
   } catch (err) {
-    console.error("[oncalltoday]", err);
-    return json({
-      ok: false,
-      error: "internal_error"
-    }, 500);
+    console.error("[oncalltoday] fatal", err);
+    return json({ ok: false, error: "internal_error" }, 500);
   }
 }
 
