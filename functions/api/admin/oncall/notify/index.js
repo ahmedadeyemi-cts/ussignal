@@ -513,17 +513,23 @@ async function sendBrevoEmail(env, { to, subject, html }) {
     })
   });
 
-  const body = await res.json();
+ const raw = await res.text();
+let body;
 
-  if (!res.ok) {
-    throw new Error(`Brevo email failed ${res.status}: ${JSON.stringify(body)}`);
-  }
-
-  console.log("[notify] Brevo accepted email:", {
-    messageId: body.messageId,
-    to
-  });
+try {
+  body = JSON.parse(raw);
+} catch {
+  body = raw;
 }
+
+if (!res.ok) {
+  throw new Error(
+    `Brevo email failed ${res.status}: ${
+      typeof body === "string" ? body : JSON.stringify(body)
+    }`
+  );
+}
+  }
 
 async function sendBrevoSms(env, { to, message }) {
   const res = await fetch("https://api.brevo.com/v3/transactionalSMS/send", {
