@@ -511,29 +511,60 @@ function renderPsCustomers() {
 
   const list = STATE.psCustomers || [];
 
-  if (!list.length) {
-    el.innerHTML = `<div class="subtle">No Professional Services customers available.</div>`;
-    return;
-  }
-
   el.innerHTML = `
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th>Customer</th>
-          <th>PIN</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${list.map(c => `
-          <tr>
-            <td>${escapeHtml(c.name || "—")}</td>
-            <td><code>${escapeHtml(c.pin || "—")}</code></td>
-          </tr>
-        `).join("")}
-      </tbody>
-    </table>
+    <div class="ps-card">
+      <div class="ps-card-head">
+        <div>
+          <h3>Professional Services Customers</h3>
+          <div class="subtle">Read-only reference · Used for IVR and SMS authentication</div>
+        </div>
+        <input
+          type="search"
+          class="ps-search"
+          placeholder="Search customers…"
+          aria-label="Search PS customers"
+        />
+      </div>
+
+      ${
+        !list.length
+          ? `<div class="subtle">No Professional Services customers available.</div>`
+          : `
+        <div class="ps-table-wrap">
+          <table class="ps-table">
+            <thead>
+              <tr>
+                <th>Customer</th>
+                <th>PIN</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${list.map(c => `
+                <tr>
+                  <td class="ps-name">${escapeHtml(c.name || "—")}</td>
+                  <td>
+                    <code class="ps-pin">${escapeHtml(c.pin || "—")}</code>
+                  </td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>
+      `}
+    </div>
   `;
+
+  // Client-side search
+  const search = el.querySelector(".ps-search");
+  if (search) {
+    search.addEventListener("input", () => {
+      const q = search.value.toLowerCase();
+      el.querySelectorAll("tbody tr").forEach(row => {
+        row.style.display =
+          row.textContent.toLowerCase().includes(q) ? "" : "none";
+      });
+    });
+  }
 }
 /* =========================
  * Filtering / Sorting
