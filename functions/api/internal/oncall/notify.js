@@ -1,12 +1,10 @@
 /**
  * POST /api/internal/oncall/notify
- *
- * Internal notification engine
- * NOT protected by Cloudflare Access
+ * Internal-only notification engine
  * Protected via x-cron-secret
  */
 
-export async function onRequest({ request, env }) {
+export async function onRequestPost({ request, env }) {
   try {
     /* ---------------- AUTH ---------------- */
     const secret = env.CRON_SHARED_SECRET;
@@ -19,59 +17,53 @@ export async function onRequest({ request, env }) {
       return json({ ok: false, error: "unauthorized" }, 401);
     }
 
-    /* ---------------- PAYLOAD ---------------- */
-    const body = await request.json().catch(() => ({}));
+    /* ---------------- BODY ---------------- */
+    let payload = {};
+    try {
+      payload = await request.json();
+    } catch {
+      payload = {};
+    }
 
     const {
       auto = false,
       cronHint = "MANUAL",
-      mode = "email"
-    } = body;
+      mode = "email",
+      dryRun = false
+    } = payload;
 
-    /* ---------------- LOAD DATA ---------------- */
-    // Example — adapt to your existing KV keys
-    const scheduleRaw = await env.ONCALL_KV.get("schedule", "json");
-
-    if (!scheduleRaw || !scheduleRaw.entries) {
-      return json({
-        ok: false,
-        error: "schedule_missing"
-      }, 500);
+    /* ---------------- LOAD SCHEDULE ---------------- */
+    const raw = await env.ONCALL_KV.get("schedule", "json");
+    if (!raw || !Array.isArray(raw.entries)) {
+      return json({ ok: false, error: "schedule_missing" }, 500);
     }
 
-    /* ---------------- BUSINESS LOGIC ---------------- */
-    const notified = [];
-
-    for (const entry of scheduleRaw.entries) {
-      if (!entry.email) continue;
-
-      // Prevent duplicates
-      if (entry.notified === true) continue;
-
-      // 🔔 SEND EMAIL HERE (placeholder)
-      // await sendEmail(entry.email, ...)
-
-      entry.notified = true;
-      notified.push(entry.email);
-    }
-
-    /* ---------------- PERSIST ---------------- */
-    await env.ONCALL_KV.put(
-      "schedule",
-      JSON.stringify(scheduleRaw)
+    /* ---------------- FILTER TARGETS ---------------- */
+    const targets = raw.entries.filter(e =>
+      e.enabled !== false &&
+      (mode === "email" || mode === "both")
     );
 
-    /* ---------------- AUDIT ---------------- */
-    await env.ONCALL_KV.put(
-      `audit:${Date.now()}`,
-      JSON.stringify({
-        ts: new Date().toISOString(),
-        auto,
+    /* ---------------- DRY RUN ---------------- */
+    if (dryRun) {
+      return json({
+        ok: true,
+        dryRun: true,
         cronHint,
         mode,
-        notified
-      })
-    );
+        count: targets.length,
+        targets: targets.map(t => ({
+          name: t.name,
+          email: t.email
+        }))
+      });
+    }
+
+    /* ---------------- SEND (SIMULATED) ---------------- */
+    const notified = [];
+    for (const t of targets) {
+      notified.push(t.email || t.name);
+    }
 
     return json({
       ok: true,
@@ -83,12 +75,15 @@ export async function onRequest({ request, env }) {
     });
 
   } catch (err) {
-    console.error("[internal:oncall:notify] fatal", err);
+    console.error("[internal-notify] fatal", err);
     return json({ ok: false, error: "internal_error" }, 500);
   }
 }
 
-/* ---------------- HELPERS ---------------- */
+/* Explicitly reject other methods */
+export async function onRequest() {
+  return new Response("Method Not Allowed", { status: 405 });
+}
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body, null, 2), {
