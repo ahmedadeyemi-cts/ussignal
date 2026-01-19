@@ -2214,7 +2214,32 @@ function normalizeEmail(e) {
 async function parseSpreadsheet(file) {
   const name = file.name.toLowerCase();
 
+  // ✅ CSV SUPPORT
+  if (name.endsWith(".csv")) {
+    const text = await file.text();
 
+    const lines = text
+      .split(/\r?\n/)
+      .map(l => l.trim())
+      .filter(Boolean);
+
+    if (!lines.length) return [];
+
+    const headers = lines[0]
+      .split(",")
+      .map(h => h.trim().toLowerCase());
+
+    return lines.slice(1).map(line => {
+      const cols = line.split(",");
+      const row = {};
+      headers.forEach((h, i) => {
+        row[h] = (cols[i] || "").trim();
+      });
+      return row;
+    });
+  }
+
+  // ✅ XLSX SUPPORT
   if (name.endsWith(".xlsx")) {
     if (!window.XLSX) {
       throw new Error("XLSX library not loaded.");
@@ -2225,7 +2250,20 @@ async function parseSpreadsheet(file) {
     return XLSX.utils.sheet_to_json(ws, { defval: "" });
   }
 
-  throw new Error("Unsupported file type.");
+  throw new Error("Unsupported file type. Please upload CSV or XLSX.");
+}
+
+  if (name.endsWith(".xlsxm")) {
+    if (!window.XLSXM) {
+      throw new Error("XLSXM library not loaded.");
+    }
+    const data = await file.arrayBuffer();
+    const wb = XLSXM.read(data);
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    return XLSXM.utils.sheet_to_json(ws, { defval: "" });
+  }
+
+  throw new Error("Unsupported file type. Please upload CSV or XLSX or XLSM.");
 }
 
 function downloadCSV(filename, rows) {
