@@ -610,6 +610,33 @@ function hideModal() {
 
 }
 /* =========================
+ * E164 Helper
+ * ========================= */
+function normalizePhoneE164(input) {
+  if (!input) return null;
+
+  // Remove everything except digits
+  let digits = String(input).replace(/\D/g, "");
+
+  // US number without country code
+  if (digits.length === 10) {
+    return "+1" + digits;
+  }
+
+  // US number with leading 1
+  if (digits.length === 11 && digits.startsWith("1")) {
+    return "+" + digits;
+  }
+
+  // Already looks like E.164
+  if (digits.length >= 11 && input.startsWith("+")) {
+    return input;
+  }
+
+  return null; // invalid
+}
+
+/* =========================
  * Schedule Creation (Manual)
  * ========================= */
 
@@ -1230,12 +1257,22 @@ function normalizeScheduleEntriesFromBulk(rows) {
 
     const entry = map.get(key);
 
-    entry.departments[r.team] = {
-      name: (r.name || "").trim(),
-      email: (r.email || "").trim(),
-      phone: (r.phone || "").trim()
-    };
-  }
+    const normalizedPhone = normalizePhoneE164(r.phone);
+
+entry.departments[r.team] = {
+  name: (r.name || "").trim(),
+  email: (r.email || "").trim(),
+  phone: normalizedPhone || ""
+};
+
+if (!normalizedPhone && r.phone) {
+  entry._phoneWarnings ||= [];
+  entry._phoneWarnings.push({
+    team: r.team,
+    value: r.phone
+  });
+}
+
 
   return Array.from(map.values());
 }
@@ -1252,29 +1289,44 @@ function wireScheduleBulkUpload() {
 
     const preview = [];
     const warnings = [];
+    let skippedRows = 0;
+
    const draft = deepClone(
   APP_STATE.draftSchedule || { entries: [] }
 );
 
 
-    incoming.forEach(ne => {
-      const conflict = detectOverlaps([...draft.entries, ne]);
-      if (conflict.length) {
-        warnings.push(`Conflict detected for ${ne.startISO}`);
-      }
+   incoming.forEach(ne => {
+  let hasInvalidPhone = false;
 
-      const existing = draft.entries.find(e =>
-        e.startISO === ne.startISO && e.endISO === ne.endISO
-      );
+  Object.values(ne.departments || {}).forEach(p => {
+    if (p.phone && !normalizePhoneE164(p.phone)) {
+      hasInvalidPhone = true;
+    }
+  });
 
-      if (existing) {
-        preview.push(`UPDATE ${ne.startISO}`);
-        Object.assign(existing.departments, ne.departments);
-      } else {
-        preview.push(`ADD ${ne.startISO}`);
-        draft.entries.push(ne);
-      }
-    });
+  if (hasInvalidPhone) {
+    skippedRows++;
+    return;
+  }
+
+  const conflict = detectOverlaps([...draft.entries, ne]);
+  if (conflict.length) {
+    warnings.push(`Conflict detected for ${ne.startISO}`);
+  }
+
+  const existing = draft.entries.find(e =>
+    e.startISO === ne.startISO && e.endISO === ne.endISO
+  );
+
+  if (existing) {
+    preview.push(`UPDATE ${ne.startISO}`);
+    Object.assign(existing.departments, ne.departments);
+  } else {
+    preview.push(`ADD ${ne.startISO}`);
+    draft.entries.push(ne);
+  }
+});
 
     showModal(
       "Schedule Upload Preview (Dry-Run)",
@@ -1282,7 +1334,25 @@ function wireScheduleBulkUpload() {
         <div class="small"><b>Changes:</b></div>
         <ul>${preview.map(p => `<li>${escapeHtml(p)}</li>`).join("")}</ul>
         ${warnings.length ? `<div class="small" style="color:#ef4444"><b>Conflicts:</b><ul>${warnings.map(w => `<li>${escapeHtml(w)}</li>`).join("")}</ul></div>` : ""}
-        <div class="small subtle">No data has been saved yet.</div>
+        <div class="small"><b>Changes:</b></div>
+<ul>${preview.map(p => `<li>${escapeHtml(p)}</li>`).join("")}</ul>
+
+${skippedRows
+  ? `<div class="warning-box">
+       ⚠️ Skipped ${skippedRows} row${skippedRows > 1 ? "s" : ""}: invalid phone format
+     </div>`
+  : ""
+}
+
+${warnings.length
+  ? `<div class="small" style="color:#ef4444">
+       <b>Conflicts:</b>
+       <ul>${warnings.map(w => `<li>${escapeHtml(w)}</li>`).join("")}</ul>
+     </div>`
+  : ""
+}
+
+<div class="small subtle">No data has been saved yet.</div>
       `,
       "Apply",
       async () => {
