@@ -914,7 +914,7 @@ function validateOnCallWindow(startISO, endISO) {
   if (s.getDay() !== 5) return "Start must be on a Friday.";
   if (e.getDay() !== 5) return "End must be on a Friday.";
   if (s.getHours() !== 16 || s.getMinutes() !== 0) return "Start time must be 4:00 PM CST.";
-  if (e.getHours() !=> 7 || e.getMinutes() !== 0) return "End time must be 7:00 AM CST.";
+  if (e.getHours() !== 7 || e.getMinutes() !== 0) return "End time must be 7:00 AM CST.";
 
   const diffMs = e - s;
 const expectedMs =
