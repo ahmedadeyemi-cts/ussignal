@@ -34,7 +34,9 @@ let APP_STATE = {
   publicMode: false,
     // notification state
   notifyStatus: {}, // entryId -> { sentAt, mode }
-
+  
+  // UI-only notification override
+  forceResend: false,
 
   // ui state
   dept: "all",
@@ -1729,18 +1731,31 @@ if (archivedEntries.length) {
   }
 
   confirmModal(
-    "Send Email Notification",
-    "Send email notification to the on-call user(s) for this week?",
-    async () => {
-      const res = await fetchAuth(`/api/admin/oncall/notify`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          mode: "email",
-          entryId: id,
-          auto: false
-        })
-      });
+  "Send Email Notification",
+  `
+    <div>Send email notification to the on-call user(s) for this week?</div>
+    <div class="inline-row" style="margin-top:10px">
+      <label>
+        <input type="checkbox" id="forceResendChk" />
+        Force resend even if already notified
+      </label>
+    </div>
+  `,
+  async () => {
+    const force =
+      document.getElementById("forceResendChk")?.checked === true;
+
+    const res = await fetchAuth(`/api/admin/oncall/notify`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        mode: "email",
+        entryId: id,
+        retry: force,
+        force: force,
+        auto: false
+      })
+    });
 
       if (!res.ok) throw new Error(await res.text());
 
@@ -1785,21 +1800,36 @@ if (action === "notifyEntry") {
 
   const already = APP_STATE.notifyStatus[id];
 
-  confirmModal(
-    already ? "Resend Notification?" : "Notify This Week",
-    already
-      ? "Notifications were already sent. Resend them now?"
-      : "Send start and end notifications for this entry?",
-    async () => {
-      const res = await fetchAuth(`/api/admin/oncall/notify`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          mode: "both",
-          entryId: id,
-          retry: !!already
-        })
-      });
+ confirmModal(
+  already ? "Resend Notification?" : "Notify This Week",
+  `
+    <div>
+      ${already
+        ? "Notifications were already sent."
+        : "Send start and end notifications for this entry?"}
+    </div>
+    <div class="inline-row" style="margin-top:10px">
+      <label>
+        <input type="checkbox" id="forceResendChk" />
+        Force resend even if already notified
+      </label>
+    </div>
+  `,
+  async () => {
+    const force =
+      document.getElementById("forceResendChk")?.checked === true;
+
+    const res = await fetchAuth(`/api/admin/oncall/notify`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        mode: "both",
+        entryId: id,
+        retry: force || !!already,
+        force: force
+      })
+    });
+
 
       if (!res.ok) throw new Error(await res.text());
 
@@ -1827,17 +1857,30 @@ if (action === "notifySMS") {
   }
 
   confirmModal(
-    "Send SMS Notification",
-    "Send SMS notification to the on-call user(s) for this week?",
-    async () => {
-      const res = await fetchAuth(`/api/admin/oncall/notify`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          mode: "sms",
-          entryId: id
-        })
-      });
+  "Send SMS Notification",
+  `
+    <div>Send SMS notification to the on-call user(s) for this week?</div>
+    <div class="inline-row" style="margin-top:10px">
+      <label>
+        <input type="checkbox" id="forceResendChk" />
+        Force resend even if already notified
+      </label>
+    </div>
+  `,
+  async () => {
+    const force =
+      document.getElementById("forceResendChk")?.checked === true;
+
+    const res = await fetchAuth(`/api/admin/oncall/notify`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        mode: "sms",
+        entryId: id,
+        retry: force,
+        force: force
+      })
+    });
 
       if (!res.ok) throw new Error(await res.text());
 
