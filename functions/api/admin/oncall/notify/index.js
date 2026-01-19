@@ -227,18 +227,19 @@ const skipSms =
   !!(await env.ONCALL_KV.get(smsKey));
 
 if (skipEmail) {
-//  skipped.push({ entryKey, channel: "email", reason: "dedupe" });
-  if (skipEmail) {
   skipped.push({
     entryKey,
     channel: "email",
-    reason: force ? "forced_bypass_failed" : "dedupe"
+    reason: "dedupe"
   });
 }
 
-}
 if (skipSms) {
-  skipped.push({ entryKey, channel: "sms", reason: "dedupe" });
+  skipped.push({
+    entryKey,
+    channel: "sms",
+    reason: "dedupe"
+  });
 }
 
       /* ---------------------------------------------
@@ -281,16 +282,13 @@ if (env.ADMIN_NOTIFICATION) {
  * EMAIL
  * --------------------------------------------- */
 if (sendEmail) {
-  if (skipEmail) {
-    skipped.push({
+  // skip already recorded earlier
+} else if (emailTo.length === 0) {
+  skipped.push({
     entryKey,
     channel: "email",
-    reason: force ? "forced_bypass_failed" : "dedupe"
+    reason: "no_recipients"
   });
-}
-
-  } else if (emailTo.length === 0) {
-    skipped.push({ entryKey, channel: "email", reason: "no_recipients" });
 
   } else if (dryRun) {
     skipped.push({
