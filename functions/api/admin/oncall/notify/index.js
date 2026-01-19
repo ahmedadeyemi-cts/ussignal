@@ -337,26 +337,6 @@ if (sendEmail && !skipEmail) {
      //**    smsSent,
     //**   skipped
     //** });
-async function audit(env, CFG, record) {
-  try {
-    const raw = (await env.ONCALL_KV.get(CFG.kv.auditKey)) || "[]";
-    const log = safeJson(raw, []);
-    log.unshift({ ts: new Date().toISOString(), ...record });
-
-    const payload = JSON.stringify(log.slice(0, 200)); // keep it small
-
-    // Hard size guard (Cloudflare KV limit safety)
-    if (payload.length > 24000) {
-      console.warn("[audit] payload too large, skipping write");
-      return;
-    }
-
-    await env.ONCALL_KV.put(CFG.kv.auditKey, payload);
-  } catch (err) {
-    console.error("[audit] failed", err);
-    // NEVER throw — audit must not break notify
-  }
-}
 
     return json({
       ok: true,
