@@ -1240,8 +1240,12 @@ function normalizeScheduleResponse(raw) {
 function normalizeScheduleEntriesFromBulk(rows) {
   const map = new Map();
 
-  for (const r of rows || []) {
-    if (!r.startISO || !r.endISO || !r.team) continue;
+  for (const raw of rows || []) {
+  const r = normalizeScheduleUploadRow(raw);
+
+  if (!r.startISO || !r.endISO || !r.team) {
+    continue;
+  }
 
     const key = `${r.startISO}::${r.endISO}`;
 
@@ -1298,18 +1302,9 @@ function wireScheduleBulkUpload() {
 
 
    incoming.forEach(ne => {
-  let hasInvalidPhone = false;
-
-  Object.values(ne.departments || {}).forEach(p => {
-    if (p.phone && !normalizePhoneE164(p.phone)) {
-      hasInvalidPhone = true;
-    }
-  });
-
-  if (hasInvalidPhone) {
-    skippedRows++;
-    return;
-  }
+ if (ne._phoneWarnings?.length) {
+  skippedRows += ne._phoneWarnings.length;
+}
 
   const conflict = detectOverlaps([...draft.entries, ne]);
   if (conflict.length) {
@@ -1329,44 +1324,52 @@ function wireScheduleBulkUpload() {
   }
 });
 
-    showModal(
-      "Schedule Upload Preview (Dry-Run)",
-      `
-        <div class="small"><b>Changes:</b></div>
-        <ul>${preview.map(p => `<li>${escapeHtml(p)}</li>`).join("")}</ul>
-        ${warnings.length ? `<div class="small" style="color:#ef4444"><b>Conflicts:</b><ul>${warnings.map(w => `<li>${escapeHtml(w)}</li>`).join("")}</ul></div>` : ""}
-        <div class="small"><b>Changes:</b></div>
-<ul>${preview.map(p => `<li>${escapeHtml(p)}</li>`).join("")}</ul>
+    const summary = `
+  <div class="upload-summary">
+    <div><b>Valid entries:</b> ${preview.length}</div>
+    <div><b>Skipped rows:</b> ${skippedRows}</div>
+  </div>
+`;
 
-${skippedRows
-  ? `<div class="warning-box">
-       ⚠️ Skipped ${skippedRows} row${skippedRows > 1 ? "s" : ""}: invalid phone format
-     </div>`
-  : ""
-}
+showModal(
+  "Schedule Upload Preview (Dry-Run)",
+  `
+    ${summary}
 
-${warnings.length
-  ? `<div class="small" style="color:#ef4444">
-       <b>Conflicts:</b>
-       <ul>${warnings.map(w => `<li>${escapeHtml(w)}</li>`).join("")}</ul>
-     </div>`
-  : ""
-}
+    ${preview.length
+      ? `<div class="small"><b>Changes:</b></div>
+         <ul>${preview.map(p => `<li>${escapeHtml(p)}</li>`).join("")}</ul>`
+      : `<div class="subtle">No valid schedule entries detected.</div>`
+    }
 
-<div class="small subtle">No data has been saved yet.</div>
-      `,
-      "Apply",
-      async () => {
-        APP_STATE.draftSchedule = draft;
-        renderScheduleAdmin(byId("schedule"));
-        refreshTimeline();
-        HAS_UNSAVED_CHANGES = true;
-        updateSaveState();
-        toast("Schedule changes applied (not saved).");
-        return true;
-      },
-      "Cancel"
-    );
+    ${warnings.length
+      ? `<div class="warning-box">
+           ⚠️ ${warnings.length} conflict warning(s)
+         </div>`
+      : ""
+    }
+
+    ${skippedRows
+      ? `<div class="warning-box">
+           ⚠️ Skipped ${skippedRows} row(s): invalid phone format or missing required fields
+         </div>`
+      : ""
+    }
+
+    <div class="small subtle">No data has been saved yet.</div>
+  `,
+  "Apply",
+  async () => {
+    APP_STATE.draftSchedule = draft;
+    renderScheduleAdmin(byId("schedule"));
+    refreshTimeline();
+    HAS_UNSAVED_CHANGES = true;
+    updateSaveState();
+    toast("Schedule changes applied (not saved).");
+    return true;
+  },
+  "Cancel"
+);
 
     input.value = "";
   };
@@ -2201,6 +2204,20 @@ async function parseSpreadsheet(file) {
     const text = await file.text();
     const [header, ...lines] = text.split(/\r?\n/).filter(Boolean);
     const headers = header.split(",").map(h => h.trim().toLowerCase());
+    /* =========================
+ * Normalize Schedule Upload Row
+ * ========================= */
+function normalizeScheduleUploadRow(raw) {
+  return {
+    startISO: raw.startiso || raw.start_iso || raw.start || raw.startdate || raw.start_date,
+    endISO: raw.endiso || raw.end_iso || raw.end || raw.enddate || raw.end_date,
+    team: raw.team || raw.department || raw.dept,
+    name: raw.name || raw.user || raw.person,
+    email: raw.email || raw.mail,
+    phone: raw.phone || raw.mobile || raw.cell
+  };
+}
+
 
     return lines.map(line => {
       const cols = line.split(",");
