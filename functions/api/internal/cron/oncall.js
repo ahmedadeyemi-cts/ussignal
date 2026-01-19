@@ -59,15 +59,23 @@ export async function onRequest({ request, env }) {
       }
     );
 
-    const text = await res.text();
+   const text = await res.text();
 
-    return json({
-      ok: res.ok,
-      status: res.status,
-      cronHint,
-      mode,
-      response: safeJSON(text)
-    });
+await sendCronHeartbeatEmail(env, {
+  cronHint,
+  mode,
+  status: res.status,
+  ok: res.ok
+});
+
+return json({
+  ok: res.ok,
+  status: res.status,
+  cronHint,
+  mode,
+  response: safeJSON(text)
+});
+
 
   } catch (err) {
     console.error("[cron:oncall] fatal", err);
@@ -76,6 +84,37 @@ export async function onRequest({ request, env }) {
 }
 
 /* ---------------- HELPERS ---------------- */
+async function sendCronHeartbeatEmail(env, payload) {
+  try {
+    if (!env.BREVO_API_KEY) return;
+
+    await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        "accept": "application/json",
+        "api-key": env.BREVO_API_KEY,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        sender: {
+          name: env.BREVO_SENDER_NAME || "On-Call Cron",
+          email: env.BREVO_SENDER_EMAIL
+        },
+        to: [
+          { email: "ahmed.adeyemi@ussignal.com", name: "Ahmed Adeyemi" }
+        ],
+        subject: `✅ On-Call Cron Fired (${payload.cronHint || "NONE"})`,
+        htmlContent: `
+          <h3>Cron Fired Successfully</h3>
+          <pre>${JSON.stringify(payload, null, 2)}</pre>
+          <p><strong>UTC:</strong> ${new Date().toISOString()}</p>
+        `
+      })
+    });
+  } catch (err) {
+    console.warn("[cron-heartbeat] email failed", err);
+  }
+}
 
 function safeJSON(text) {
   try {
