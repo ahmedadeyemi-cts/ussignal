@@ -1235,6 +1235,20 @@ function normalizeScheduleResponse(raw) {
   return { entries };
 }
 /* =========================
+ * Normalize Schedule Upload Row
+ * ========================= */
+function normalizeScheduleUploadRow(raw) {
+  return {
+    startISO: raw.startiso || raw.start_iso || raw.start || raw.startdate || raw.start_date,
+    endISO: raw.endiso || raw.end_iso || raw.end || raw.enddate || raw.end_date,
+    team: raw.team || raw.department || raw.dept,
+    name: raw.name || raw.user || raw.person,
+    email: raw.email || raw.mail,
+    phone: raw.phone || raw.mobile || raw.cell
+  };
+}
+
+/* =========================
  * Client-Side Normalization (Bulk Upload Input)
  * ========================= */
 function normalizeScheduleEntriesFromBulk(rows) {
@@ -2200,32 +2214,6 @@ function normalizeEmail(e) {
 async function parseSpreadsheet(file) {
   const name = file.name.toLowerCase();
 
-  if (name.endsWith(".csv")) {
-    const text = await file.text();
-    const [header, ...lines] = text.split(/\r?\n/).filter(Boolean);
-    const headers = header.split(",").map(h => h.trim().toLowerCase());
-    /* =========================
- * Normalize Schedule Upload Row
- * ========================= */
-function normalizeScheduleUploadRow(raw) {
-  return {
-    startISO: raw.startiso || raw.start_iso || raw.start || raw.startdate || raw.start_date,
-    endISO: raw.endiso || raw.end_iso || raw.end || raw.enddate || raw.end_date,
-    team: raw.team || raw.department || raw.dept,
-    name: raw.name || raw.user || raw.person,
-    email: raw.email || raw.mail,
-    phone: raw.phone || raw.mobile || raw.cell
-  };
-}
-
-
-    return lines.map(line => {
-      const cols = line.split(",");
-      const row = {};
-      headers.forEach((h, i) => row[h] = (cols[i] || "").trim());
-      return row;
-    });
-  }
 
   if (name.endsWith(".xlsx")) {
     if (!window.XLSX) {
