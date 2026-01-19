@@ -1578,9 +1578,15 @@ activeEntries.forEach(e => {
 
                 ${
                   (() => {
+  (() => {
   const n = APP_STATE.notifyStatus[e.id] || {};
+
   const hasEmail = !!n.email;
-  const hasSMS = Array.isArray(n.sms) && n.sms.length > 0;
+  const hasSMS = !!n.sms;
+
+  const emailForced = n.email?.force === true;
+  const smsForced = n.sms?.force === true;
+  const wasForced = emailForced || smsForced;
 
   if (!hasEmail && !hasSMS) {
     return `<span class="notify-badge pending">⏳ Pending</span>`;
@@ -1591,6 +1597,13 @@ activeEntries.forEach(e => {
       ${hasEmail ? `<span class="notify-badge email">📧 Email</span>` : ""}
       ${hasSMS ? `<span class="notify-badge sms">📱 SMS</span>` : ""}
       ${hasEmail && hasSMS ? `<span class="notify-badge both">✅ Both</span>` : ""}
+
+      ${
+        wasForced
+          ? `<span class="notify-badge forced" title="Notification was force resent">🔁 Forced</span>`
+          : ``
+      }
+
       <button class="ghost small"
         data-action="notifyTimeline"
         data-id="${escapeHtml(String(e.id))}">
