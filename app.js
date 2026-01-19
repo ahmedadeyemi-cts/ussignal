@@ -2253,19 +2253,6 @@ async function parseSpreadsheet(file) {
   throw new Error("Unsupported file type. Please upload CSV or XLSX.");
 }
 
-  if (name.endsWith(".xlsxm")) {
-    if (!window.XLSXM) {
-      throw new Error("XLSXM library not loaded.");
-    }
-    const data = await file.arrayBuffer();
-    const wb = XLSXM.read(data);
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    return XLSXM.utils.sheet_to_json(ws, { defval: "" });
-  }
-
-  throw new Error("Unsupported file type. Please upload CSV or XLSX or XLSM.");
-}
-
 function downloadCSV(filename, rows) {
   if (!rows.length) {
     toast("Nothing to download.");
