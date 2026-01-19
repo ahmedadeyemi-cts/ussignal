@@ -285,14 +285,6 @@ if (sendEmail && !skipEmail) {
   emailsSent += emailTo.length;
 }
 
-    await env.ONCALL_KV.put(
-      emailKey,
-      JSON.stringify({ ts: new Date().toISOString() }),
-      { expirationTtl: 60 * 60 * 24 * 45 }
-    );
-  }
-  emailsSent += emailTo.length;
-}
       /* ---------------------------------------------
        * SMS
        * --------------------------------------------- */
