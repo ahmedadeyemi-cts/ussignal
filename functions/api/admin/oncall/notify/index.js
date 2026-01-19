@@ -160,15 +160,15 @@ export async function onRequest(ctx) {
       const hm = hhmmInTz(now, tz);
 
       const intended =
-        cronHint === "FRIDAY"
-          ? "FRIDAY"
-          : cronHint === "MONDAY"
-            ? "MONDAY"
-            : day === 5
-              ? "FRIDAY"
-              : day === 1
-                ? "MONDAY"
-                : "UNKNOWN";
+  cronHint === "FRIDAY"
+    ? "FRIDAY"
+    : cronHint === "MONDAY"
+      ? "MONDAY"
+      : day === "FRIDAY"
+        ? "FRIDAY"
+        : day === "MONDAY"
+          ? "MONDAY"
+          : "UNKNOWN";
 
       const allowed =
         intended === "FRIDAY"
@@ -214,8 +214,8 @@ export async function onRequest(ctx) {
       const emailKey = `${CFG.kv.notifyPrefix}${entryKey}:email:${notifyType}`;
       const smsKey = `${CFG.kv.notifyPrefix}${entryKey}:sms:${notifyType}`;
 
-     const skipEmail = sendEmail && (await env.ONCALL_KV.get(emailKey));
-const skipSms = sendSMS && (await env.ONCALL_KV.get(smsKey));
+    const skipEmail = sendEmail && !!(await env.ONCALL_KV.get(emailKey));
+const skipSms = sendSMS && !!(await env.ONCALL_KV.get(smsKey));
 
 if (skipEmail) {
   skipped.push({ entryKey, channel: "email", reason: "dedupe" });
@@ -256,8 +256,10 @@ if (env.ADMIN_NOTIFICATION && env.ADMIN_NOTIFICATION.includes("@")) {
       /* ---------------------------------------------
        * EMAIL
        * --------------------------------------------- */
-    if (sendEmail && emailTo.length > 0 && !skipEmail) {
-  if (!dryRun) {
+if (sendEmail && !skipEmail) {
+  if (emailTo.length === 0) {
+    skipped.push({ entryKey, channel: "email", reason: "no_recipients" });
+  } else if (!dryRun) {
     await sendBrevoEmail(env, {
       to: emailTo,
       subject:
@@ -272,6 +274,16 @@ if (env.ADMIN_NOTIFICATION && env.ADMIN_NOTIFICATION.includes("@")) {
         env.PUBLIC_PORTAL_URL
       )
     });
+
+    await env.ONCALL_KV.put(
+      emailKey,
+      JSON.stringify({ ts: new Date().toISOString() }),
+      { expirationTtl: 60 * 60 * 24 * 45 }
+    );
+  }
+
+  emailsSent += emailTo.length;
+}
 
     await env.ONCALL_KV.put(
       emailKey,
@@ -382,7 +394,7 @@ function hhmmInTz(d, tz) {
 function dayOfWeekInTz(d, tz) {
   return new Intl.DateTimeFormat("en-US", {
     timeZone: tz,
-    weekday: "short"
+    weekday: "long"
   })
     .format(d)
     .toUpperCase();
@@ -522,16 +534,26 @@ async function sendBrevoEmail(env, { to, subject, html }) {
 }
 
 async function sendBrevoSms(env, { to, message }) {
-  await fetch("https://api.brevo.com/v3/transactionalSMS/send", {
+  const res = await fetch("https://api.brevo.com/v3/transactionalSMS/send", {
     method: "POST",
-    headers: { "content-type": "application/json", "api-key": env.BREVO_API_KEY },
+    headers: {
+      "content-type": "application/json",
+      "api-key": env.BREVO_API_KEY
+    },
     body: JSON.stringify({
       sender: env.SMS_SENDER_ID || "USSignal",
       to,
       message
     })
   });
+
+  const body = await res.text();
+
+  if (!res.ok) {
+    throw new Error(`Brevo SMS failed ${res.status}: ${body}`);
+  }
 }
+
 
 async function sendTeamsWebhook(url, entry, type) {
   await fetch(url, {
