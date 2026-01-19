@@ -1,37 +1,21 @@
 /**
  * POST /api/oncall/notify-department
  *
- * Public, unauthenticated IVR-safe endpoint.
- * Automatically emails the on-call engineer for a department.
- *
- * Query params:
- *  - department (collaboration | system_storage | enterprise_network)
- *  - pin
- *  - customerPhone
- *  - customerName
+ * Public IVR-safe endpoint.
+ * Emails the on-call engineer for a department.
  */
 
 export async function onRequest({ request, env }) {
   try {
     const url = new URL(request.url);
 
-    // -----------------------------
-    // Parse + normalize parameters
-    // -----------------------------
-    const department = url.searchParams
-      .get("department")
-      ?.trim()
-      .toLowerCase();
-
+    const department = url.searchParams.get("department")?.trim().toLowerCase();
     const pin = url.searchParams.get("pin")?.trim();
     const customerPhone = url.searchParams.get("customerPhone")?.trim();
     const customerName = url.searchParams.get("customerName")?.trim();
 
     if (!department || !pin || !customerPhone || !customerName) {
-      return json(
-        { ok: false, error: "missing_parameters" },
-        400
-      );
+      return json({ ok: false, error: "missing_parameters" }, 400);
     }
 
     // -----------------------------
@@ -39,90 +23,84 @@ export async function onRequest({ request, env }) {
     // -----------------------------
     const raw = await env.ONCALL_KV.get("ONCALL:CURRENT");
     if (!raw) {
-      return json(
-        { ok: false, error: "oncall_not_found" },
-        500
-      );
+      return json({ ok: false, error: "oncall_not_found" }, 500);
     }
 
     let current;
     try {
       current = JSON.parse(raw);
     } catch {
-      return json(
-        { ok: false, error: "oncall_parse_error" },
-        500
-      );
+      return json({ ok: false, error: "oncall_parse_error" }, 500);
     }
 
     const engineer = current?.departments?.[department];
-
     if (!engineer || !engineer.email) {
-      return json(
-        { ok: false, error: "engineer_not_found" },
-        404
-      );
+      return json({ ok: false, error: "engineer_not_found" }, 404);
     }
 
     // -----------------------------
-    // Validate Brevo env
+    // Validate email config
     // -----------------------------
     if (
       !env.BREVO_API_KEY ||
       !env.BREVO_SENDER_EMAIL ||
       !env.BREVO_SENDER_NAME
     ) {
-      return json(
-        { ok: false, error: "email_not_configured" },
-        500
-      );
+      return json({ ok: false, error: "email_not_configured" }, 500);
     }
 
     // -----------------------------
-    // Send email (minimal Brevo-safe)
+    // BREVO — minimal, guaranteed payload
     // -----------------------------
-    const res = await fetch(
-      "https://api.brevo.com/v3/smtp/email",
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "api-key": env.BREVO_API_KEY
-        },
-        body: JSON.stringify({
-          sender: {
-            email: env.BREVO_SENDER_EMAIL,
-            name: env.BREVO_SENDER_NAME
-          },
-          to: [
-            {
-              email: engineer.email,
-              name: engineer.name || "On-Call Engineer"
-            }
-          ],
-          subject: "OneAssist Support Call",
-          htmlContent: `
-            <p>
-              You are receiving this email because
-              <b>${customerName}</b> called the OneAssist support number.
-            </p>
+    const payload = {
+      sender: {
+        email: env.BREVO_SENDER_EMAIL,
+        name: env.BREVO_SENDER_NAME
+      },
+      to: [
+        {
+          email: engineer.email,
+          name: engineer.name || "On-Call Engineer"
+        }
+      ],
+      subject: "OneAssist Support Call",
+      htmlContent:
+        "<p>" +
+        customerName +
+        " called OneAssist Support.</p>" +
+        "<p>Department: " +
+        department +
+        "</p>" +
+        "<p>Customer PIN: " +
+        pin +
+        "</p>" +
+        "<p>Customer Phone: " +
+        customerPhone +
+        "</p>"
+    };
 
-            <p><b>Department:</b> ${department}</p>
-            <p><b>Customer PIN:</b> ${pin}</p>
-            <p><b>Customer Phone:</b> ${customerPhone}</p>
+    const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "api-key": env.BREVO_API_KEY
+      },
+      body: JSON.stringify(payload)
+    });
 
-            <p>
-              Please ensure you reach out to the customer
-              if you missed the call.
-            </p>
-          `
-        })
-      }
-    );
+    const text = await res.text();
 
-    const body = await res.text();
     if (!res.ok) {
-      throw new Error(`Brevo failed ${res.status}: ${body}`);
+      // 🔥 RETURN BREVO ERROR DIRECTLY
+      return json(
+        {
+          ok: false,
+          error: "brevo_error",
+          status: res.status,
+          detail: text
+        },
+        500
+      );
     }
 
     // -----------------------------
