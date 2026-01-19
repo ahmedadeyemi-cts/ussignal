@@ -1,82 +1,61 @@
 /**
  * POST /api/internal/oncall/notify
  *
- * Internal notification trigger
- * - Used by cron
- * - Protected by x-cron-secret
- * - NOT blocked by Cloudflare Access
+ * Internal notify endpoint (cron-safe)
+ * NOT protected by Cloudflare Access
+ * Protected by x-cron-secret
  */
 
 export async function onRequestPost({ request, env }) {
   try {
+    /* ---------------- AUTH ---------------- */
     const secret = env.CRON_SHARED_SECRET;
     if (!secret) {
       return json({ ok: false, error: "cron_secret_not_set" }, 500);
     }
 
-    const hdr = request.headers.get("x-cron-secret");
-    if (hdr !== secret) {
+    if (request.headers.get("x-cron-secret") !== secret) {
       return json({ ok: false, error: "unauthorized" }, 401);
     }
 
-    if (!env.PUBLIC_PORTAL_URL) {
-      return json({
-        ok: false,
-        error: "missing_PUBLIC_PORTAL_URL"
-      }, 500);
-    }
-
+    /* ---------------- PAYLOAD ---------------- */
     let payload = {};
     try {
       payload = await request.json();
-    } catch {}
+    } catch {
+      payload = {};
+    }
 
-    const { cronHint = "MONDAY", mode = "email", dryRun = true } = payload;
-
-    const targetUrl = `${env.PUBLIC_PORTAL_URL}/api/admin/oncall/notify`;
-
-    let res;
-    try {
-      res = await fetch(targetUrl, {
+    /* ---------------- CALL NOTIFY ENGINE ---------------- */
+    const res = await fetch(
+      `${env.PUBLIC_PORTAL_URL}/api/admin/oncall/notify`,
+      {
         method: "POST",
         headers: {
           "content-type": "application/json",
           "x-cron-secret": secret
         },
-        body: JSON.stringify({
-          cronHint,
-          mode,
-          auto: true,
-          dryRun
-        })
-      });
-    } catch (fetchErr) {
-      return json({
-        ok: false,
-        error: "fetch_failed",
-        details: String(fetchErr)
-      }, 500);
-    }
+        body: JSON.stringify(payload)
+      }
+    );
 
-    const rawText = await res.text();
+    const text = await res.text();
 
     return json({
-      ok: res.ok,
+      ok: true,
       status: res.status,
-      called: targetUrl,
+      called: "/api/admin/oncall/notify",
       responseType: res.headers.get("content-type"),
-      rawResponse: rawText.slice(0, 500)
+      rawResponse: text
     });
 
   } catch (err) {
-    return json({
-      ok: false,
-      error: "fatal_exception",
-      details: String(err)
-    }, 500);
+    console.error("[internal-oncall-notify] fatal", err);
+    return json({ ok: false, error: "internal_error" }, 500);
   }
 }
 
+/* OPTIONAL: allow GET for testing */
 export const onRequestGet = onRequestPost;
 
 function json(body, status = 200) {
