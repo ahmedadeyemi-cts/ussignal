@@ -279,15 +279,19 @@ async function initApp(ctx = {}) {
   }
 
   // continue with UI wiring...
-const psUploadBtn = byId("psUploadCsvBtn");
-const psUploadInput = byId("psUploadCsvInput");
+//const psUploadBtn = byId("psUploadCsvBtn");
+//const psUploadInput = byId("psUploadCsvInput");
 
-if (psUploadBtn && psUploadInput) {
-  psUploadBtn.onclick = () => psUploadInput.click();
+//if (psUploadBtn && psUploadInput) {
+ // psUploadBtn.onclick = () => psUploadInput.click();
+ // psUploadInput.onchange = () =>
+ //   handlePsCustomersBulkUpload(psUploadInput.files?.[0]);
+//}
+const psUploadInput = byId("psUploadCsvInput");
+if (psUploadInput) {
   psUploadInput.onchange = () =>
     handlePsCustomersBulkUpload(psUploadInput.files?.[0]);
 }
-
    // =========================
   // Role Badge
   // =========================
