@@ -226,44 +226,31 @@
   </div>
 </section>
 
-<!-- ✅ PS CUSTOMERS (TOP-LEVEL PANEL) -->
-<!-- PS CUSTOMERS -->
+<!-- PS Customers -->
 <section id="psCustomersTab" class="panel">
-
-  <!-- HEADER -->
   <div class="panel-head">
     <h2>OneAssist Customers</h2>
 
     <div class="panel-actions">
       <button id="psAddCustomerBtn" class="primary">Add Customer</button>
 
-      <!-- BULK UPLOAD -->
+      <!-- Bulk Upload -->
       <label class="ghost file-btn">
         Bulk Upload (CSV / Excel)
-        <input
-          id="psUploadCsvInput"
-          type="file"
-          accept=".csv,.xlsx"
-          hidden
-        />
+        <input id="psUploadCsvInput" type="file" accept=".csv,.xlsx" hidden />
       </label>
-
-      <!-- OPTIONAL DOWNLOAD BUTTONS (SAFE TO KEEP EVEN IF UNUSED) -->
-      <button id="psDownloadCsvBtn" class="ghost">Download CSV</button>
-      <button id="psDownloadIvrBtn" class="ghost">Download IVR CSV</button>
 
       <button id="psSaveCustomersBtn" class="ghost">Save</button>
       <button id="psReloadCustomersBtn" class="ghost">Reload</button>
+      <button id="psDownloadCsvBtn" class="ghost">Download CSV</button>
+      <button id="psDownloadIvrBtn" class="ghost">Download IVR CSV</button>
     </div>
   </div>
 
-  <!-- HELP TEXT -->
   <div class="small subtle" style="margin-bottom:10px">
-    PINs must be <b>exactly 5 digits</b>.  
-    SMS authentication and IVR validation rely on these values.
+    PINs must be <b>exactly 5 digits</b>. SMS authentication and IVR validation rely on these values.
   </div>
 
-  <!-- SEARCH -->
   <input
     id="psCustomerSearch"
     placeholder="Search customer name or PIN…"
@@ -271,14 +258,13 @@
     style="margin-bottom:10px;max-width:320px"
   />
 
-  <!-- RENDER TARGET (APP.JS INJECTS TABLE HERE) -->
   <div id="psCustomers"></div>
 
   <div class="small subtle" style="margin-top:12px">
     Changes are not active until <b>Save</b> is clicked.
   </div>
-
 </section>
+
   <!-- AUDIT -->
   <section id="auditTab" class="panel">
     <div class="panel-head">
