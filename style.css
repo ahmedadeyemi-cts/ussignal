@@ -818,3 +818,15 @@ body {
   color: #9a3412;
   font-size: 13px;
 }
+.force-resend {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.force-resend input {
+  cursor: pointer;
+}
