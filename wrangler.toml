@@ -1,5 +1,18 @@
-[triggers]
-crons = ["*/10 * * * *"]
+name = "oncall-pages"
+compatibility_date = "2024-01-01"
+
+[vars]
+CRON_SHARED_SECRET = "7Seals^C"
+
+[[triggers.cron]]
+cron = "0 13 * * 1"
+
+[[triggers.cron]]
+cron = "0 13 * * 2"
+
+[[triggers.cron]]
+cron = "0 13 * * 5"
+
 
 
 #[triggers]
