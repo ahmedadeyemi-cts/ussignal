@@ -5,6 +5,10 @@
  * Protected via x-cron-secret
  */
 
+/* =========================================================
+   PRIMARY HANDLER (UNCHANGED LOGIC)
+   ========================================================= */
+
 export async function onRequest({ request, env }) {
   try {
     /* ---------------- AUTH ---------------- */
@@ -59,23 +63,23 @@ export async function onRequest({ request, env }) {
       }
     );
 
-   const text = await res.text();
+    const text = await res.text();
 
-await sendCronHeartbeatEmail(env, {
-  cronHint,
-  mode,
-  status: res.status,
-  ok: res.ok
-});
+    /* ---------------- HEARTBEAT EMAIL ---------------- */
+    await sendCronHeartbeatEmail(env, {
+      cronHint,
+      mode,
+      status: res.status,
+      ok: res.ok
+    });
 
-return json({
-  ok: res.ok,
-  status: res.status,
-  cronHint,
-  mode,
-  response: safeJSON(text)
-});
-
+    return json({
+      ok: res.ok,
+      status: res.status,
+      cronHint,
+      mode,
+      response: safeJSON(text)
+    });
 
   } catch (err) {
     console.error("[cron:oncall] fatal", err);
@@ -83,7 +87,24 @@ return json({
   }
 }
 
-/* ---------------- HELPERS ---------------- */
+/* =========================================================
+   PAGES CRON + METHOD DISPATCH FIX (REQUIRED)
+   ========================================================= */
+
+// Cloudflare Pages cron invokes POST
+export async function onRequestPost(ctx) {
+  return onRequest(ctx);
+}
+
+// Allow GET for browser / Postman testing
+export async function onRequestGet(ctx) {
+  return onRequest(ctx);
+}
+
+/* =========================================================
+   HELPERS (UNCHANGED)
+   ========================================================= */
+
 async function sendCronHeartbeatEmail(env, payload) {
   try {
     if (!env.BREVO_API_KEY) return;
