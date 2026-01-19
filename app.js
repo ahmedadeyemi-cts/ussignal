@@ -612,6 +612,22 @@ function hideModal() {
 
 }
 /* =========================
+ * Force Resend Check Helper
+ * ========================= */
+function getForceResendChecked() {
+  const chk = document.getElementById("forceResendChk");
+
+  if (!chk) {
+    console.warn(
+      "[notify] forceResendChk not found — modal HTML may not have rendered correctly"
+    );
+    return false;
+  }
+
+  return chk.checked === true;
+}
+
+/* =========================
  * E164 Helper
  * ========================= */
 function normalizePhoneE164(input) {
@@ -1744,17 +1760,31 @@ if (archivedEntries.length) {
   confirmModal(
   "Send Email Notification",
   `
-    <div>Send email notification to the on-call user(s) for this week?</div>
-    <div class="inline-row" style="margin-top:10px">
-      <label>
-        <input type="checkbox" id="forceResendChk" />
-        Force resend even if already notified
-      </label>
-    </div>
-  `,
+  <div>Send email notification to the on-call user(s) for this week?</div>
+
+  ${
+    APP_STATE.notifyStatus[id]
+      ? `<div class="warning-box" style="margin-top:10px">
+           ⚠️ Already notified — force resend required
+         </div>`
+      : ""
+  }
+
+  <div class="inline-row" style="margin-top:10px">
+    <label>
+      <input type="checkbox" id="forceResendChk" />
+      Force resend even if already notified
+    </label>
+  </div>
+`,
   async () => {
-    const force =
-      document.getElementById("forceResendChk")?.checked === true;
+    const alreadyNotified = !!APP_STATE.notifyStatus[id];
+const force = getForceResendChecked();
+
+if (alreadyNotified && !force) {
+  toast("Already notified — force resend required", 4000);
+  return false; // keep modal open
+}
 
     const res = await fetchAuth(`/api/admin/oncall/notify`, {
       method: "POST",
@@ -1879,8 +1909,13 @@ if (action === "notifySMS") {
     </div>
   `,
   async () => {
-    const force =
-      document.getElementById("forceResendChk")?.checked === true;
+   const alreadyNotified = !!already;
+const force = getForceResendChecked();
+
+if (alreadyNotified && !force) {
+  toast("Already notified — force resend required", 4000);
+  return false;
+}
 
     const res = await fetchAuth(`/api/admin/oncall/notify`, {
       method: "POST",
