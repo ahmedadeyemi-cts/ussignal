@@ -36,8 +36,14 @@ export async function onRequest({ env }) {
       const existingTs = existing?.sentAt || existing?.ts || null;
       const incomingTs = meta?.sentAt || meta?.ts || null;
 
-      const existingTime = existingTs ? Date.parse(existingTs) : -1;
-      const incomingTime = incomingTs ? Date.parse(incomingTs) : -1;
+     const existingTime = Number.isFinite(Date.parse(existingTs))
+  ? Date.parse(existingTs)
+  : -1;
+
+const incomingTime = Number.isFinite(Date.parse(incomingTs))
+  ? Date.parse(incomingTs)
+  : -1;
+
 
       if (!existing || incomingTime >= existingTime) {
         status[entryId][channel] = {
