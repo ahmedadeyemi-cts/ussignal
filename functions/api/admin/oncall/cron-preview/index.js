@@ -1,34 +1,41 @@
 /**
  * GET /api/admin/oncall/cron-preview
  *
- * Dry-run preview of cron behavior.
- * No sends. No KV writes.
- * Protected via CRON_SHARED_SECRET if defined.
+ * Secure dry-run preview of cron behavior.
+ * - No emails sent
+ * - No SMS sent
+ * - No KV writes
+ * - Shows exactly who WOULD be notified
+ *
+ * Requires:
+ *   Header: x-cron-secret = CRON_SHARED_SECRET
  */
 
 export async function onRequest({ request, env }) {
   try {
-    /* --------------------------------------------------
-     * OPTIONAL SHARED-SECRET PROTECTION
-     * -------------------------------------------------- */
+    /* ======================================================
+       CRON AUTH (REQUIRED)
+    ====================================================== */
     const secret = env.CRON_SHARED_SECRET;
-    if (secret) {
-      const hdr = request.headers.get("x-cron-secret");
-      if (hdr !== secret) {
-        return json({ ok: false, error: "unauthorized" }, 401);
-      }
+    if (!secret) {
+      return json({ ok: false, error: "cron_secret_not_configured" }, 500);
     }
 
-    /* --------------------------------------------------
-     * KV VALIDATION
-     * -------------------------------------------------- */
+    const hdr = request.headers.get("x-cron-secret");
+    if (hdr !== secret) {
+      return json({ ok: false, error: "unauthorized" }, 401);
+    }
+
+    /* ======================================================
+       ENV VALIDATION
+    ====================================================== */
     if (!env.ONCALL_KV) {
       return json({ ok: false, error: "kv_not_bound" }, 500);
     }
 
-    /* --------------------------------------------------
-     * TIME CONTEXT (America/Chicago)
-     * -------------------------------------------------- */
+    /* ======================================================
+       TIME (America/Chicago)
+    ====================================================== */
     const now = new Date(
       new Date().toLocaleString("en-US", { timeZone: "America/Chicago" })
     );
@@ -46,26 +53,38 @@ export async function onRequest({ request, env }) {
     } else {
       return json({
         ok: true,
+        dryRun: true,
         cronHint: "NONE",
-        message: "Cron would take no action today"
+        now: now.toISOString(),
+        message: "Cron would take no action today",
+        targets: []
       });
     }
 
-    /* --------------------------------------------------
-     * LOAD SCHEDULE
-     * -------------------------------------------------- */
+    /* ======================================================
+       LOAD SCHEDULE
+    ====================================================== */
     const raw = await env.ONCALL_KV.get("ONCALL:SCHEDULE");
     if (!raw) {
       return json({ ok: false, error: "schedule_not_found" }, 404);
     }
 
-    const schedule = JSON.parse(raw);
+    let schedule;
+    try {
+      schedule = JSON.parse(raw);
+    } catch {
+      return json({ ok: false, error: "invalid_schedule_json" }, 500);
+    }
+
     const entries = Array.isArray(schedule.entries)
       ? schedule.entries
       : [];
 
     const targets = [];
 
+    /* ======================================================
+       EVALUATE EACH ENTRY
+    ====================================================== */
     for (const entry of entries) {
       const start = new Date(entry.startISO);
       const end = new Date(entry.endISO);
@@ -99,15 +118,22 @@ export async function onRequest({ request, env }) {
           .forEach(e => emailRecipients.push(e));
       }
 
-      for (const p of Object.values(entry.departments || {})) {
-        if (!p) continue;
+      /* Department engineers */
+      for (const dept of Object.values(entry.departments || {})) {
+        if (!dept) continue;
 
-        if (mode !== "sms" && p.email) {
-          emailRecipients.push(p.email);
+        if (mode !== "sms" && dept.email) {
+          emailRecipients.push(dept.email);
         }
 
-        if (mode !== "email" && p.phone && notifyType === "START_TODAY") {
-          smsRecipients.push(p.phone);
+        if (
+          mode !== "email" &&
+          dept.phone &&
+          notifyType === "START_TODAY"
+        ) {
+          smsRecipients.push(
+            String(dept.phone).replace(/^\+/, "")
+          );
         }
       }
 
@@ -125,24 +151,27 @@ export async function onRequest({ request, env }) {
       });
     }
 
+    /* ======================================================
+       RESPONSE
+    ====================================================== */
     return json({
       ok: true,
-      now: now.toISOString(),
+      dryRun: true,
       cronHint,
       mode,
-      dryRun: true,
+      now: now.toISOString(),
       targets
     });
 
   } catch (err) {
-    console.error("[cron-preview] error", err);
+    console.error("[cron-preview] fatal", err);
     return json({ ok: false, error: "internal_error" }, 500);
   }
 }
 
-/* --------------------------------------------------
- * JSON HELPER
- * -------------------------------------------------- */
+/* ======================================================
+   JSON HELPER
+====================================================== */
 function json(body, status = 200) {
   return new Response(JSON.stringify(body, null, 2), {
     status,
