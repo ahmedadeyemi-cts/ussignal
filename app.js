@@ -378,8 +378,8 @@ if (!APP_STATE.publicMode) {
     savePsCustomers
   ));
   onClick("psReloadCustomersBtn", loadPsCustomers);
-//  onClick("psDownloadCsvBtn", downloadPsCustomersCSV);
-//  onClick("psDownloadIvrBtn", downloadPsCustomersIVRCSV);
+  onClick("psDownloadCsvBtn", downloadPsCustomersCSV);
+  onClick("psDownloadIvrBtn", downloadPsCustomersIVRCSV);
 
     // =========================
   // FINALIZE UI FIRST (SAFE)
