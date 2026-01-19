@@ -1,2 +1,9 @@
 [triggers]
 crons = ["*/10 * * * *"]
+
+
+#[triggers]
+#crons = [
+ # "0 13 * * 1", # Monday 8am CST
+#  "0 13 * * 5"  # Friday 8am CST
+#]
