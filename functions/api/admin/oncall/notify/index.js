@@ -559,10 +559,18 @@ async function sendTeamsWebhook(url, entry, type) {
 }
 
 async function audit(env, CFG, record) {
-  const raw = (await env.ONCALL_KV.get(CFG.kv.auditKey)) || "[]";
-  const log = safeJson(raw, []);
-  log.unshift({ ts: new Date().toISOString(), ...record });
-  await env.ONCALL_KV.put(CFG.kv.auditKey, JSON.stringify(log.slice(0, 500)));
+  try {
+    const raw = (await env.ONCALL_KV.get(CFG.kv.auditKey)) || "[]";
+    const log = safeJson(raw, []);
+    log.unshift({ ts: new Date().toISOString(), ...record });
+
+    const payload = JSON.stringify(log.slice(0, 200));
+    if (payload.length > 24000) return;
+
+    await env.ONCALL_KV.put(CFG.kv.auditKey, payload);
+  } catch (err) {
+    console.error("[audit] failed", err);
+  }
 }
 
 export const onRequestPost = onRequest;
