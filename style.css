@@ -830,3 +830,25 @@ body {
 .force-resend input {
   cursor: pointer;
 }
+/* =========================
+ * Notify Badge — Forced Resend
+ * ========================= */
+
+.notify-badge.forced {
+  background: linear-gradient(135deg, #f97316, #ef4444); /* orange → red */
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+/* Dark mode tuning (optional but recommended) */
+body.dark .notify-badge.forced {
+  background: linear-gradient(135deg, #fb923c, #f87171);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* Tooltip cursor hint */
+.notify-badge.forced {
+  cursor: help;
+}
