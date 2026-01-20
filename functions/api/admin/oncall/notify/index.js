@@ -246,21 +246,6 @@ if (skipSms) {
        * RECIPIENTS
        * --------------------------------------------- */
       const emailTo = [];
-
-// 🔔 Always include admin notification(s)
-if (env.ADMIN_NOTIFICATION) {
-  const admins = String(env.ADMIN_NOTIFICATION)
-    .split(",")
-    .map(e => e.trim())
-    .filter(e => e.includes("@"));
-
-  for (const email of admins) {
-    emailTo.push({
-      email,
-      name: "On-Call Admin"
-    });
-  }
-}
       const smsTo = [];
 
       for (const p of Object.values(entry.departments || {})) {
@@ -323,7 +308,32 @@ if (sendEmail && skipEmail) {
   // ✅ COUNT ONE SEND PER ENTRY (not per recipient)
   emailsSent += 1;
 }
+/* ---------------------------------------------
+ * ADMIN EMAIL (NO DEDUPE)
+ * --------------------------------------------- */
+if (sendEmail && env.ADMIN_NOTIFICATION && !dryRun) {
+  const admins = String(env.ADMIN_NOTIFICATION)
+    .split(",")
+    .map(e => e.trim())
+    .filter(e => e.includes("@"));
 
+  if (admins.length) {
+    await sendBrevoEmail(env, {
+      to: admins.map(email => ({ email, name: "On-Call Admin" })),
+      subject:
+        notifyType === "UPCOMING"
+          ? "On-Call Schedule – Upcoming Week (Admin Copy)"
+          : "On-Call Starts Today (Admin Copy)",
+      html: buildEmailHtml(
+        BRAND,
+        entry,
+        tz,
+        notifyType,
+        env.PUBLIC_PORTAL_URL
+      )
+    });
+  }
+}
       /* ---------------------------------------------
        * SMS
        * --------------------------------------------- */
