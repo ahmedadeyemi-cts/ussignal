@@ -4,7 +4,7 @@ compatibility_date = "2026-01-01"
 
 [[kv_namespaces]]
 binding = "ONCALL_KV"
-id = "YOUR_KV_ID"
+id = "ONCALL:SCHEDULE"
 
 [vars]
 CRON_SHARED_SECRET = "7Seals^C"
