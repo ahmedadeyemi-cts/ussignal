@@ -42,6 +42,11 @@ export async function onRequestPost({ request, env }) {
         triggeredBy: "cron",
         count: 0,
         notifications: [],
+        summary: {
+          cronHint: "NONE",
+          mode: null,
+          oncall: []
+        },
         note: "No cron action today"
       });
     }
@@ -59,12 +64,22 @@ export async function onRequestPost({ request, env }) {
 
     /* ---------------- ENUMERATE ---------------- */
     const notifications = [];
+    const oncallSummary = [];
 
     for (const entry of entries) {
+      // existing machine-readable output (unchanged)
       notifications.push({
         entryId: entry.id,
         cronHint,
         mode
+      });
+
+      // NEW: human-readable summary
+      oncallSummary.push({
+        id: entry.id,
+        name: entry.name || null,
+        email: entry.email || null,
+        phone: entry.phone || null
       });
     }
 
@@ -73,6 +88,15 @@ export async function onRequestPost({ request, env }) {
       ok: true,
       triggeredBy: "cron",
       count: notifications.length,
+
+      // NEW: human-readable block (safe, additive)
+      summary: {
+        cronHint,
+        mode,
+        oncall: oncallSummary
+      },
+
+      // EXISTING: machine/debug output (unchanged)
       notifications
     });
 
