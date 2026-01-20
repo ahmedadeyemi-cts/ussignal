@@ -4,7 +4,7 @@ compatibility_date = "2026-01-01"
 
 [[kv_namespaces]]
 binding = "ONCALL_KV"
-id = "e24b26bb9352494aab02480f12e0b920"
+id = "e24b26bb9352494aab02480f12e0b920" #Retrieved From CloudFlare. KV namespace ID that your existing on-call system already uses.
 
 [vars]
 CRON_SHARED_SECRET = "7Seals^C"
