@@ -4,12 +4,12 @@ compatibility_date = "2026-01-01"
 
 [[kv_namespaces]]
 binding = "ONCALL_KV"
-id = "ONCALL:SCHEDULE"
+id = "e24b26bb9352494aab02480f12e0b920"
 
 [vars]
 CRON_SHARED_SECRET = "7Seals^C"
 BREVO_SENDER_EMAIL = "oncall@onenecklab.com"
-BREVO_SENDER_NAME = "On-Call Cron"
+BREVO_SENDER_NAME = "On-Call Weekly Schedule"
 ADMIN_NOTIFICATION = "ahmed.adeyemi@ussignal.com,kevin.damisch@ussignal.com"
 SMS_PROVIDER_URL = "https://api.brevo.com/v3/transactionalSMS/send"
 
