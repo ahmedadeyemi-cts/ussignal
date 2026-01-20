@@ -1,11 +1,13 @@
 /**
  * POST /api/internal/oncall/notify
  *
- * Internal on-call notification engine
- * - Email (Mon + Fri)
- * - SMS (Friday only)
- * - Admin digest
- * - dryRun supported
+ * On-Call Notification Engine (DATE-DRIVEN)
+ * - Resolves active on-call window from ONCALL:SCHEDULE
+ * - Monday: Email on-call + Admin digest
+ * - Friday: Email + SMS on-call + Admin digest
+ * - Supports dryRun=true
+ * - NO admin routes
+ * - NO Access
  */
 
 export async function onRequestPost({ request, env }) {
@@ -21,10 +23,18 @@ export async function onRequestPost({ request, env }) {
     }
 
     /* ---------------- INPUT ---------------- */
+    const url = new URL(request.url);
+    const dryRun = url.searchParams.get("dryRun") === "true";
+
     const body = await request.json().catch(() => ({}));
-    const dryRun = body.dryRun === true;
     const cronHint = body.cronHint || "UNKNOWN";
     const mode = body.mode || "email";
+
+    /* ---------------- TIME ---------------- */
+    const tz = "America/Chicago";
+    const now = new Date(
+      new Date().toLocaleString("en-US", { timeZone: tz })
+    );
 
     /* ---------------- LOAD SCHEDULE ---------------- */
     const raw = await env.ONCALL_KV.get("ONCALL:SCHEDULE");
@@ -33,60 +43,81 @@ export async function onRequestPost({ request, env }) {
     }
 
     const schedule = JSON.parse(raw);
-    const entries = Array.isArray(schedule.entries)
-      ? schedule.entries
-      : [];
+    const entries = Array.isArray(schedule.entries) ? schedule.entries : [];
 
-    /* ---------------- BUILD SUMMARY ---------------- */
-    const oncall = entries.map(e => ({
-      id: e.id,
-      name: e.name,
-      email: e.email,
-      phone: e.phone || null,
-      department: e.department
-    }));
+    /* ---------------- RESOLVE ACTIVE WINDOW ---------------- */
+    const active = entries.find(e => {
+      const start = new Date(e.startISO);
+      const end = new Date(e.endISO);
+      return now >= start && now < end;
+    });
+
+    if (!active) {
+      return json({
+        ok: false,
+        error: "no_active_oncall_window",
+        now: now.toISOString()
+      }, 404);
+    }
+
+    /* ---------------- RESOLVE PEOPLE ---------------- */
+    const oncall = Object.entries(active.departments || {}).map(
+      ([department, person]) => ({
+        department,
+        name: person.name,
+        email: person.email,
+        phone: person.phone || null
+      })
+    );
+
+    /* ---------------- SUMMARY ---------------- */
+    const summary = {
+      window: {
+        start: active.startISO,
+        end: active.endISO
+      },
+      count: oncall.length,
+      oncall
+    };
+
+    /* ---------------- DRY RUN ---------------- */
+    if (dryRun) {
+      return json({
+        ok: true,
+        triggeredBy: "engine",
+        cronHint,
+        mode,
+        dryRun: true,
+        summary
+      });
+    }
 
     /* ---------------- EMAIL: ONCALL ---------------- */
-    if (!dryRun && (mode === "email" || mode === "both")) {
-      for (const person of oncall) {
-        if (!person.email) continue;
+    await sendOncallEmail(env, {
+      cronHint,
+      window: summary.window,
+      recipients: oncall
+    });
 
-        await sendEmail(env, {
-          to: person.email,
-          subject: `On-Call Reminder (${cronHint})`,
-          html: `
-            <p>Hello ${person.name},</p>
-            <p>You are scheduled for <strong>${cronHint}</strong> on-call coverage.</p>
-            <p>Please be ready.</p>
-          `
-        });
-      }
+    /* ---------------- EMAIL: ADMIN DIGEST ---------------- */
+    if (env.ADMIN_NOTIFICATION) {
+      await sendAdminDigest(env, {
+        cronHint,
+        now,
+        summary
+      });
     }
 
-    /* ---------------- SMS: FRIDAY ONLY ---------------- */
-    if (!dryRun && cronHint === "FRIDAY") {
+    /* ---------------- SMS (FRIDAY ONLY) ---------------- */
+    if (cronHint === "FRIDAY") {
       for (const person of oncall) {
         if (!person.phone) continue;
-
         await sendSMS(env, {
-          to: person.phone,
-          message: `On-call reminder: You are on-call this Friday. Please be ready.`
+          phone: person.phone,
+          name: person.name,
+          window: summary.window
         });
       }
-    }
-
-    /* ---------------- ADMIN DIGEST ---------------- */
-    if (!dryRun && env.ADMIN_NOTIFICATION) {
-      await sendEmail(env, {
-        to: env.ADMIN_NOTIFICATION,
-        subject: `On-Call Digest (${cronHint})`,
-        html: `
-          <h3>On-Call Summary</h3>
-          <ul>
-            ${oncall.map(p => `<li>${p.name} – ${p.email}</li>`).join("")}
-          </ul>
-        `
-      });
     }
 
     /* ---------------- RESPONSE ---------------- */
@@ -95,11 +126,8 @@ export async function onRequestPost({ request, env }) {
       triggeredBy: "engine",
       cronHint,
       mode,
-      dryRun,
-      summary: {
-        count: oncall.length,
-        oncall
-      }
+      dryRun: false,
+      summary
     });
 
   } catch (err) {
@@ -108,14 +136,29 @@ export async function onRequestPost({ request, env }) {
   }
 }
 
-/* ================= EMAIL ================= */
+/* ============================================================
+   EMAIL — ONCALL
+============================================================ */
 
-async function sendEmail(env, { to, subject, html }) {
+async function sendOncallEmail(env, payload) {
   if (!env.BREVO_API_KEY) return;
 
-  return fetch("https://api.brevo.com/v3/smtp/email", {
+  const html = `
+    <h2>📞 You Are On-Call</h2>
+    <p><strong>Coverage Window</strong></p>
+    <p>${payload.window.start} → ${payload.window.end}</p>
+  `;
+
+  const text =
+`You are on-call.
+
+Coverage window:
+${payload.window.start} → ${payload.window.end}`;
+
+  await fetch("https://api.brevo.com/v3/smtp/email", {
     method: "POST",
     headers: {
+      "accept": "application/json",
       "api-key": env.BREVO_API_KEY,
       "content-type": "application/json"
     },
@@ -124,34 +167,75 @@ async function sendEmail(env, { to, subject, html }) {
         name: env.BREVO_SENDER_NAME || "On-Call System",
         email: env.BREVO_SENDER_EMAIL
       },
-      to: [{ email: to }],
-      subject,
-      htmlContent: html
+      to: payload.recipients.map(p => ({
+        email: p.email,
+        name: p.name
+      })),
+      subject: "📞 On-Call Assignment",
+      htmlContent: html,
+      textContent: text
     })
   });
 }
 
-/* ================= SMS (BREVO) ================= */
+/* ============================================================
+   EMAIL — ADMIN DIGEST
+============================================================ */
 
-async function sendSMS(env, { to, message }) {
-  if (!env.BREVO_API_KEY || !env.SMS_PROVIDER_URL) return;
+async function sendAdminDigest(env, payload) {
+  const html = `
+    <h2>📊 On-Call Digest (${payload.cronHint})</h2>
+    <pre>${JSON.stringify(payload.summary, null, 2)}</pre>
+    <p><strong>UTC:</strong> ${new Date().toISOString()}</p>
+  `;
 
-  return fetch(env.SMS_PROVIDER_URL, {
+  await fetch("https://api.brevo.com/v3/smtp/email", {
     method: "POST",
     headers: {
+      "accept": "application/json",
+      "api-key": env.BREVO_API_KEY,
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({
+      sender: {
+        name: env.BREVO_SENDER_NAME || "On-Call Cron",
+        email: env.BREVO_SENDER_EMAIL
+      },
+      to: [{ email: env.ADMIN_NOTIFICATION }],
+      subject: `📊 On-Call Digest — ${payload.cronHint}`,
+      htmlContent: html,
+      textContent: JSON.stringify(payload.summary, null, 2)
+    })
+  });
+}
+
+/* ============================================================
+   SMS — FRIDAY ONLY
+============================================================ */
+
+async function sendSMS(env, payload) {
+  if (!env.SMS_PROVIDER_URL || !env.BREVO_API_KEY) return;
+
+  await fetch(env.SMS_PROVIDER_URL, {
+    method: "POST",
+    headers: {
+      "accept": "application/json",
       "api-key": env.BREVO_API_KEY,
       "content-type": "application/json"
     },
     body: JSON.stringify({
       sender: "OnCall",
-      recipient: to.replace(/^\+/, ""),
-      content: message,
-      type: "transactional"
+      recipient: payload.phone,
+      content:
+        `You are on-call.\n` +
+        `Window:\n${payload.window.start} → ${payload.window.end}`
     })
   });
 }
 
-/* ================= UTIL ================= */
+/* ============================================================
+   HELPERS
+============================================================ */
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body, null, 2), {
