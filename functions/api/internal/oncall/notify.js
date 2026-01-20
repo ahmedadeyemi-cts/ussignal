@@ -1,10 +1,11 @@
 /**
- * POST /api/internal/cron/oncall
+ * POST /api/internal/oncall/notify
  *
- * Internal cron enumerator (SAFE VERSION)
- * - No admin routes
- * - No Access
- * - No side effects
+ * Internal on-call notification engine
+ * - Email (Mon + Fri)
+ * - SMS (Friday only)
+ * - Admin digest
+ * - dryRun supported
  */
 
 export async function onRequestPost({ request, env }) {
@@ -15,41 +16,15 @@ export async function onRequestPost({ request, env }) {
       return json({ ok: false, error: "cron_secret_not_set" }, 500);
     }
 
-    const hdr = request.headers.get("x-cron-secret");
-    if (hdr !== secret) {
+    if (request.headers.get("x-cron-secret") !== secret) {
       return json({ ok: false, error: "unauthorized" }, 401);
     }
 
-    /* ---------------- TIME ---------------- */
-    const tz = "America/Chicago";
-    const now = new Date(
-      new Date().toLocaleString("en-US", { timeZone: tz })
-    );
-
-    const day = now.getDay(); // 1=Mon, 5=Fri
-    let cronHint = null;
-    let mode = null;
-
-    if (day === 1) {
-      cronHint = "MONDAY";
-      mode = "email";
-    } else if (day === 5) {
-      cronHint = "FRIDAY";
-      mode = "both";
-    } else {
-      return json({
-        ok: true,
-        triggeredBy: "cron",
-        count: 0,
-        notifications: [],
-        summary: {
-          cronHint: "NONE",
-          mode: null,
-          oncall: []
-        },
-        note: "No cron action today"
-      });
-    }
+    /* ---------------- INPUT ---------------- */
+    const body = await request.json().catch(() => ({}));
+    const dryRun = body.dryRun === true;
+    const cronHint = body.cronHint || "UNKNOWN";
+    const mode = body.mode || "email";
 
     /* ---------------- LOAD SCHEDULE ---------------- */
     const raw = await env.ONCALL_KV.get("ONCALL:SCHEDULE");
@@ -62,51 +37,121 @@ export async function onRequestPost({ request, env }) {
       ? schedule.entries
       : [];
 
-    /* ---------------- ENUMERATE ---------------- */
-    const notifications = [];
-    const oncallSummary = [];
+    /* ---------------- BUILD SUMMARY ---------------- */
+    const oncall = entries.map(e => ({
+      id: e.id,
+      name: e.name,
+      email: e.email,
+      phone: e.phone || null,
+      department: e.department
+    }));
 
-    for (const entry of entries) {
-      // existing machine-readable output (unchanged)
-      notifications.push({
-        entryId: entry.id,
-        cronHint,
-        mode
-      });
+    /* ---------------- EMAIL: ONCALL ---------------- */
+    if (!dryRun && (mode === "email" || mode === "both")) {
+      for (const person of oncall) {
+        if (!person.email) continue;
 
-      // NEW: human-readable summary
-      oncallSummary.push({
-        id: entry.id,
-        name: entry.name || null,
-        email: entry.email || null,
-        phone: entry.phone || null
+        await sendEmail(env, {
+          to: person.email,
+          subject: `On-Call Reminder (${cronHint})`,
+          html: `
+            <p>Hello ${person.name},</p>
+            <p>You are scheduled for <strong>${cronHint}</strong> on-call coverage.</p>
+            <p>Please be ready.</p>
+          `
+        });
+      }
+    }
+
+    /* ---------------- SMS: FRIDAY ONLY ---------------- */
+    if (!dryRun && cronHint === "FRIDAY") {
+      for (const person of oncall) {
+        if (!person.phone) continue;
+
+        await sendSMS(env, {
+          to: person.phone,
+          message: `On-call reminder: You are on-call this Friday. Please be ready.`
+        });
+      }
+    }
+
+    /* ---------------- ADMIN DIGEST ---------------- */
+    if (!dryRun && env.ADMIN_NOTIFICATION) {
+      await sendEmail(env, {
+        to: env.ADMIN_NOTIFICATION,
+        subject: `On-Call Digest (${cronHint})`,
+        html: `
+          <h3>On-Call Summary</h3>
+          <ul>
+            ${oncall.map(p => `<li>${p.name} – ${p.email}</li>`).join("")}
+          </ul>
+        `
       });
     }
 
     /* ---------------- RESPONSE ---------------- */
     return json({
       ok: true,
-      triggeredBy: "cron",
-      count: notifications.length,
-
-      // NEW: human-readable block (safe, additive)
+      triggeredBy: "engine",
+      cronHint,
+      mode,
+      dryRun,
       summary: {
-        cronHint,
-        mode,
-        oncall: oncallSummary
-      },
-
-      // EXISTING: machine/debug output (unchanged)
-      notifications
+        count: oncall.length,
+        oncall
+      }
     });
 
   } catch (err) {
-    console.error("[cron:oncall] fatal", err);
+    console.error("[oncall:notify] fatal", err);
     return json({ ok: false, error: "internal_error" }, 500);
   }
 }
 
-/* ---------------- HELPERS ---------------- */
+/* ================= EMAIL ================= */
+
+async function sendEmail(env, { to, subject, html }) {
+  if (!env.BREVO_API_KEY) return;
+
+  return fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: {
+      "api-key": env.BREVO_API_KEY,
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({
+      sender: {
+        name: env.BREVO_SENDER_NAME || "On-Call System",
+        email: env.BREVO_SENDER_EMAIL
+      },
+      to: [{ email: to }],
+      subject,
+      htmlContent: html
+    })
+  });
+}
+
+/* ================= SMS (BREVO) ================= */
+
+async function sendSMS(env, { to, message }) {
+  if (!env.BREVO_API_KEY || !env.SMS_PROVIDER_URL) return;
+
+  return fetch(env.SMS_PROVIDER_URL, {
+    method: "POST",
+    headers: {
+      "api-key": env.BREVO_API_KEY,
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({
+      sender: "OnCall",
+      recipient: to.replace(/^\+/, ""),
+      content: message,
+      type: "transactional"
+    })
+  });
+}
+
+/* ================= UTIL ================= */
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body, null, 2), {
