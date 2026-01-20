@@ -10,7 +10,7 @@ id = "e24b26bb9352494aab02480f12e0b920" #Retrieved From CloudFlare. KV namespace
 CRON_SHARED_SECRET = "7Seals^C"
 BREVO_SENDER_EMAIL = "oncall@onenecklab.com"
 BREVO_SENDER_NAME = "On-Call Weekly Schedule"
-ADMIN_NOTIFICATION = "ahmed.adeyemi@ussignal.com,kevin.damisch@ussignal.com"
+ADMIN_NOTIFICATION = "ahmed.adeyemi@ussignal.com,kevin.damisch@ussignal.com,jason.mosier@ussignal.com,Bill.Emanuel@ussignal.com,Matthew.LeNoble@ussignal.com"
 SMS_PROVIDER_URL = "https://api.brevo.com/v3/transactionalSMS/send"
 
 [triggers]
