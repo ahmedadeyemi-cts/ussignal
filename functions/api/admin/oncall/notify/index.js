@@ -412,7 +412,8 @@ if (sendEmail && env.ADMIN_NOTIFICATION && !dryRun) {
       ? "No emails sent. Check skipped[] for reasons."
       : undefined
 });
-}
+} // ✅ CLOSE onRequest HERE
+
 // ---------------------------------------------
   // Normalize SMS to E164
   // ---------------------------------------------
