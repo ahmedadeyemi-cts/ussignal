@@ -92,7 +92,7 @@ export async function onRequest(ctx) {
     if (request.method === "POST") {
       try {
         payload = await request.json();
-      } catch {}
+      } catch (err) {}
     }
 
     const {
@@ -466,7 +466,7 @@ function json(obj, status = 200) {
 function safeJson(s, f) {
   try {
     return JSON.parse(s);
-  } catch {
+  } catch (err) {
     return f;
   }
 }
@@ -644,10 +644,10 @@ async function sendBrevoEmail(env, { to, subject, html }) {
   let body;
 
   try {
-    body = JSON.parse(raw);
-  } catch {
-    body = raw;
-  }
+  body = JSON.parse(raw);
+} catch (err) {
+  body = raw;
+}
 
   if (!res.ok) {
     throw new Error(
