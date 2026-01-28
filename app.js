@@ -1953,6 +1953,8 @@ if (action === "notifySMS") {
   },
   "Cancel"
 );
+  return;
+}
 
   el.querySelectorAll("input[data-time]").forEach(inp => {
     inp.onchange = () => {
