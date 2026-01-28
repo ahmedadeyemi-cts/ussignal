@@ -1847,7 +1847,7 @@ if (action === "notifyEntry") {
 
   const already = APP_STATE.notifyStatus[id];
 
- confirmModal(
+confirmModalHtml(
   already ? "Resend Notification?" : "Notify This Week",
   `
     <div>
@@ -1855,6 +1855,7 @@ if (action === "notifyEntry") {
         ? "Notifications were already sent."
         : "Send start and end notifications for this entry?"}
     </div>
+
     <div class="inline-row" style="margin-top:10px">
       <label>
         <input type="checkbox" id="forceResendChk" />
@@ -1881,21 +1882,18 @@ if (action === "notifyEntry") {
         force: force
       })
     });
+return; // ✅ REQUIRED — prevents notifySMS nesting
 
+    if (!res.ok) throw new Error(await res.text());
 
-      if (!res.ok) throw new Error(await res.text());
+    await loadNotifyStatus();
+    renderScheduleAdmin(el);
 
-    // 🔑 Re-sync from KV (authoritative)
-await loadNotifyStatus();
+    toast(already ? "Notifications resent." : "Notifications sent.");
+    return true;
+  }
+);
 
-// 🔑 Re-render from persisted state
-renderScheduleAdmin(el);
-
-toast(already ? "Notifications resent." : "Notifications sent.");
-    }
-  );
-  return;
-}
 if (action === "notifySMS") {
   const entry = APP_STATE.scheduleFull?.entries?.find(e => String(e.id) === String(id));
   if (!entry || isPastOnCall(entry)) {
@@ -1904,43 +1902,46 @@ if (action === "notifySMS") {
   }
 
   confirmModalHtml(
-  "Send SMS Notification",
-  `
-    <div>Send SMS notification to the on-call user(s) for this week?</div>
-    <div class="inline-row" style="margin-top:10px">
-      <label>
-        <input type="checkbox" id="forceResendChk" />
-        Force resend even if already notified
-      </label>
-    </div>
-  `,
-  async () => {
-    const alreadyNotified = !!APP_STATE.notifyStatus[id];
-    const force = getForceResendChecked();
+    "Send SMS Notification",
+    `
+      <div>Send SMS notification to the on-call user(s) for this week?</div>
+      <div class="inline-row" style="margin-top:10px">
+        <label>
+          <input type="checkbox" id="forceResendChk" />
+          Force resend even if already notified
+        </label>
+      </div>
+    `,
+    async () => {
+      const alreadyNotified = !!APP_STATE.notifyStatus[id];
+      const force = getForceResendChecked();
 
-    if (alreadyNotified && !force) {
-      toast("Already notified — force resend required", 4000);
-      return false;
+      if (alreadyNotified && !force) {
+        toast("Already notified — force resend required", 4000);
+        return false;
+      }
+
+      const res = await fetchAuth(`/api/admin/oncall/notify`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          mode: "sms",
+          entryId: id,
+          force
+        })
+      });
+
+      if (!res.ok) throw new Error(await res.text());
+
+      await loadNotifyStatus();
+      renderScheduleAdmin(el);
+      toast("SMS notification sent.");
+      return true;
     }
+  );
 
-    const res = await fetchAuth(`/api/admin/oncall/notify`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        mode: "sms",
-        entryId: id,
-        force
-      })
-    });
-
-    if (!res.ok) throw new Error(await res.text());
-
-    await loadNotifyStatus();
-    renderScheduleAdmin(el);
-    toast("SMS notification sent.");
-    return true;
-  }
-);
+  return; // ✅ IMPORTANT: stop processing other handlers
+}
 
   el.querySelectorAll("input[data-time]").forEach(inp => {
     inp.onchange = () => {
@@ -2901,7 +2902,8 @@ function wireRosterBulkUpload() {
 }
 async function loadNotifyStatus() {
   try {
-    const res = await fetch("/api/admin/oncall/notify-status", {
+    const res = await fetchAuth("/api/admin/oncall/notify-status", {
+      method: "GET",
       cache: "no-store"
     });
     if (!res.ok) return;
