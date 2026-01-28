@@ -35,8 +35,6 @@ let APP_STATE = {
     // notification state
   notifyStatus: {}, // entryId -> { sentAt, mode }
   
-  // UI-only notification override
-  forceResend: false,
 
   // ui state
   dept: "all",
@@ -623,6 +621,65 @@ function hideModal() {
   modal.classList.add("hidden");
   modal.setAttribute("aria-hidden", "true");
 
+}
+async function openSmsNotifyModal(entryId, el) {
+  const entry = APP_STATE.scheduleFull?.entries?.find(e => String(e.id) === String(entryId));
+  if (!entry || isPastOnCall(entry)) {
+    toast("Cannot send SMS for past on-call weeks.");
+    return;
+  }
+
+  showModal(
+    "Send SMS Notification",
+    `
+      <div>Send SMS notification to the on-call user(s) for this week?</div>
+
+      ${
+        APP_STATE.notifyStatus[entryId]
+          ? `<div class="warning-box" style="margin-top:10px">
+               ⚠️ Already notified — force resend required
+             </div>`
+          : ""
+      }
+
+      <div class="inline-row" style="margin-top:10px">
+        <label>
+          <input type="checkbox" id="forceResendChk" />
+          Force resend even if already notified
+        </label>
+      </div>
+    `,
+    "Confirm",
+    async () => {
+      const force = getForceResendChecked();
+      const alreadyNotified = !!APP_STATE.notifyStatus[entryId];
+
+      if (alreadyNotified && !force) {
+        toast("Already notified — force resend required", 4000);
+        return false;
+      }
+
+      const res = await fetchAuth(`/api/admin/oncall/notify`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          mode: "sms",
+          entryId,
+          retry: force,
+          force,
+          auto: false
+        })
+      });
+
+      if (!res.ok) throw new Error(await res.text());
+
+      await loadNotifyStatus();
+      renderScheduleAdmin(el);
+      toast("SMS notification sent.");
+      return true;
+    },
+    "Cancel"
+  );
 }
 /* =========================
  * Force Resend Check Helper
@@ -1531,6 +1588,7 @@ function renderScheduleAdmin(el) {
     DEPT_KEYS.map(dep => [dep, { name: "", email: "", phone: "" }])
   )
 }));
+
 // ===============================
 // SPLIT ACTIVE vs ARCHIVED ENTRIES
 // ===============================
@@ -1607,12 +1665,13 @@ activeEntries.forEach(e => {
   (() => {
     const n = APP_STATE.notifyStatus[e.id] || {};
 
-    const hasEmail = !!n.email;
-    const hasSMS = !!n.sms;
+    const hasSMS = Array.isArray(n.sms) && n.sms.length > 0;
+const hasEmail = !!n.email;
 
-    const emailForced = n.email?.force === true;
-    const smsForced = n.sms?.force === true;
-    const wasForced = emailForced || smsForced;
+const emailForced = n.email?.force === true;
+const smsForced = Array.isArray(n.sms) && n.sms.some(s => s.force === true);
+const wasForced = emailForced || smsForced;
+
 
     if (!hasEmail && !hasSMS) {
       return `<span class="notify-badge pending">⏳ Pending</span>`;
@@ -1895,66 +1954,10 @@ confirmModalHtml(
   return; // ✅ REQUIRED — prevents notifySMS nesting
 }
 if (action === "notifySMS") {
-  const entry = APP_STATE.scheduleFull?.entries?.find(e => String(e.id) === String(id));
-  if (!entry || isPastOnCall(entry)) {
-    toast("Cannot send SMS for past on-call weeks.");
-    return;
-  }
-
-  showModal(
-    "Send SMS Notification",
-    `
-      <div>Send SMS notification to the on-call user(s) for this week?</div>
-
-      ${
-        APP_STATE.notifyStatus[id]
-          ? `<div class="warning-box" style="margin-top:10px">
-               ⚠️ Already notified — force resend required
-             </div>`
-          : ""
-      }
-
-      <div class="inline-row" style="margin-top:10px">
-        <label>
-          <input type="checkbox" id="forceResendChk" />
-          Force resend even if already notified
-        </label>
-      </div>
-    `,
-    "Confirm",
-    async () => {
-      const alreadyNotified = !!APP_STATE.notifyStatus[id];
-      const force = getForceResendChecked();
-
-      if (alreadyNotified && !force) {
-        toast("Already notified — force resend required", 4000);
-        return false; // keep modal open
-      }
-
-      const res = await fetchAuth(`/api/admin/oncall/notify`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          mode: "sms",
-          entryId: id,
-          retry: force,
-          force: force,
-          auto: false
-        })
-      });
-
-      if (!res.ok) throw new Error(await res.text());
-
-      await loadNotifyStatus();
-      renderScheduleAdmin(el);
-      toast("SMS notification sent.");
-      return true;
-    },
-    "Cancel"
-  );
-
+  openSmsNotifyModal(id, el);
   return;
 }
+
   el.querySelectorAll("input[data-time]").forEach(inp => {
     inp.onchange = () => {
       HAS_UNSAVED_CHANGES = true;
