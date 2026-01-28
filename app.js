@@ -8,7 +8,7 @@
 // - Diff preview before save
 // - Roster management (modal add user, inline edits, remove)
 // - Auto-generate controls (calls worker endpoint)
-// - Audit log viewer.
+// - Audit log viewer
 // - Calendar timeline UI
 // - ICS export (download .ics from worker endpoint)
 //Adding Download and upload options update
