@@ -628,15 +628,15 @@ function hideModal() {
  * Force Resend Check Helper
  * ========================= */
 function getForceResendChecked() {
-  const scope = document.getElementById("modalBody") || document;
-  const chk = scope.querySelector("#forceResendChk");
-
-  if (!chk) {
-    console.warn("[notify] forceResendChk not found — modal HTML may not have rendered correctly");
+  const modal = document.getElementById("modal");
+  if (!modal || !modal.classList.contains("modal-open")) {
     return false;
   }
-  return chk.checked === true;
+
+  const chk = modal.querySelector("#forceResendChk");
+  return chk ? chk.checked === true : false;
 }
+
 
 /* =========================
  * E164 Helper
@@ -1902,16 +1902,25 @@ if (action === "notifySMS") {
   }
 
   confirmModalHtml(
-    "Send SMS Notification",
-    `
-      <div>Send SMS notification to the on-call user(s) for this week?</div>
-      <div class="inline-row" style="margin-top:10px">
-        <label>
-          <input type="checkbox" id="forceResendChk" />
-          Force resend even if already notified
-        </label>
-      </div>
-    `,
+  "Send SMS Notification",
+  `
+    <div>Send SMS notification to the on-call user(s) for this week?</div>
+
+    ${
+      APP_STATE.notifyStatus[id]
+        ? `<div class="warning-box" style="margin-top:10px">
+             ⚠️ Already notified — force resend required
+           </div>`
+        : ""
+    }
+
+    <div class="inline-row" style="margin-top:10px">
+      <label>
+        <input type="checkbox" id="forceResendChk" />
+        Force resend even if already notified
+      </label>
+    </div>
+  `,
     async () => {
       const alreadyNotified = !!APP_STATE.notifyStatus[id];
       const force = getForceResendChecked();
