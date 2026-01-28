@@ -1924,8 +1924,7 @@ if (action === "notifySMS") {
       </div>
     `,
     async () => {
-      const modal = document.getElementById("modal");
-      const force = modal?.querySelector("#forceResendChk")?.checked === true;
+      const force = getForceResendChecked();
 
       if (alreadyNotified && !force) {
         toast("Already notified — force resend required", 4000);
