@@ -349,16 +349,25 @@ if (sendEmail && env.ADMIN_NOTIFICATION && !dryRun) {
        * --------------------------------------------- */
       if (sendSMS && smsTo.length && !skipSms) {
   for (const phone of smsTo) {
-    if (!dryRun) {
-      await sendBrevoSms(env, {
-        to: phone,
-        message: `US Signal On-Call: Your on-call duty starts now and ends ${formatCstFromIso(
-          entry.endISO,
-          tz
-        )}.`
+    try {
+      if (!dryRun) {
+        await sendBrevoSms(env, {
+          to: phone,
+          message: `US Signal On-Call: Your on-call duty starts now and ends ${formatCstFromIso(
+            entry.endISO,
+            tz
+          )}.`
+        });
+      }
+      smsSent++;
+    } catch (err) {
+      skipped.push({
+        entryKey,
+        channel: "sms",
+        reason: "send_failed",
+        error: String(err?.message || err)
       });
     }
-    smsSent++;
   }
 
         if (!dryRun) {
