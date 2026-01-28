@@ -271,6 +271,7 @@ if (skipSms) {
     });
   }
 }
+} // ✅ CLOSE for (const p of Object.values(entry.departments))
 
 /* ---------------------------------------------
  * EMAIL
