@@ -1901,33 +1901,34 @@ if (action === "notifySMS") {
     return;
   }
 
-  confirmModalHtml(
-  "Send SMS Notification",
-  `
-    <div>Send SMS notification to the on-call user(s) for this week?</div>
+  showModal(
+    "Send SMS Notification",
+    `
+      <div>Send SMS notification to the on-call user(s) for this week?</div>
 
-    ${
-      APP_STATE.notifyStatus[id]
-        ? `<div class="warning-box" style="margin-top:10px">
-             ⚠️ Already notified — force resend required
-           </div>`
-        : ""
-    }
+      ${
+        APP_STATE.notifyStatus[id]
+          ? `<div class="warning-box" style="margin-top:10px">
+               ⚠️ Already notified — force resend required
+             </div>`
+          : ""
+      }
 
-    <div class="inline-row" style="margin-top:10px">
-      <label>
-        <input type="checkbox" id="forceResendChk" />
-        Force resend even if already notified
-      </label>
-    </div>
-  `,
+      <div class="inline-row" style="margin-top:10px">
+        <label>
+          <input type="checkbox" id="forceResendChk" />
+          Force resend even if already notified
+        </label>
+      </div>
+    `,
+    "Confirm",
     async () => {
       const alreadyNotified = !!APP_STATE.notifyStatus[id];
       const force = getForceResendChecked();
 
       if (alreadyNotified && !force) {
         toast("Already notified — force resend required", 4000);
-        return false;
+        return false; // keep modal open
       }
 
       const res = await fetchAuth(`/api/admin/oncall/notify`, {
@@ -1936,7 +1937,9 @@ if (action === "notifySMS") {
         body: JSON.stringify({
           mode: "sms",
           entryId: id,
-          force
+          retry: force,
+          force: force,
+          auto: false
         })
       });
 
@@ -1946,12 +1949,12 @@ if (action === "notifySMS") {
       renderScheduleAdmin(el);
       toast("SMS notification sent.");
       return true;
-    }
+    },
+    "Cancel"
   );
 
-  return; // ✅ IMPORTANT: stop processing other handlers
+  return;
 }
-
   el.querySelectorAll("input[data-time]").forEach(inp => {
     inp.onchange = () => {
       HAS_UNSAVED_CHANGES = true;
