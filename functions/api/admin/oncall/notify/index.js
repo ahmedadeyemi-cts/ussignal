@@ -259,9 +259,19 @@ if (skipSms) {
 }
 
         if (sendSMS && p.phone && inWindow && notifyType === "START_TODAY") {
-          smsTo.push(p.phone);
-        }
-      }
+  const e164 = normalizeToE164(p.phone, "US");
+
+  if (e164) {
+    smsTo.push(e164);
+  } else {
+    skipped.push({
+      entryKey,
+      channel: "sms",
+      reason: "invalid_phone_format",
+      phone: p.phone
+    });
+  }
+}
 
 /* ---------------------------------------------
  * EMAIL
@@ -564,7 +574,41 @@ async function sendBrevoEmail(env, { to, subject, html }) {
       .map(e => e.trim())
       .find(e => e.includes("@")) || null;
   })();
+  // ---------------------------------------------
+  // Normalize SMS to E164
+  // ---------------------------------------------
+function normalizeToE164(phone, defaultCountry = "US") {
+  if (!phone) return null;
 
+  // Strip everything except digits and +
+  let cleaned = String(phone).trim();
+
+  // Already E.164
+  if (cleaned.startsWith("+") && /^\+\d{10,15}$/.test(cleaned)) {
+    return cleaned;
+  }
+
+  // Remove all non-digits
+  const digits = cleaned.replace(/\D/g, "");
+
+  // US default handling
+  if (defaultCountry === "US") {
+    // 10-digit US number
+    if (digits.length === 10) {
+      return `+1${digits}`;
+    }
+
+    // 11-digit starting with 1
+    if (digits.length === 11 && digits.startsWith("1")) {
+      return `+${digits}`;
+    }
+  }
+
+  // Fallback: reject
+  return null;
+}
+
+  
   // ---------------------------------------------
   // Build payload
   // ---------------------------------------------
@@ -618,8 +662,11 @@ async function sendBrevoEmail(env, { to, subject, html }) {
   // ✅ Return Brevo proof
   return body?.messageId || null;
 }
-
 async function sendBrevoSms(env, { to, message }) {
+  if (!to.startsWith("+")) {
+    throw new Error(`SMS rejected: number not E.164 (${to})`);
+  }
+
   const res = await fetch("https://api.brevo.com/v3/transactionalSMS/send", {
     method: "POST",
     headers: {
@@ -639,6 +686,7 @@ async function sendBrevoSms(env, { to, message }) {
     throw new Error(`Brevo SMS failed ${res.status}: ${body}`);
   }
 }
+
 
 
 async function sendTeamsWebhook(url, entry, type) {
