@@ -27,7 +27,6 @@
 export async function onRequest(ctx) {
   const { request, env } = ctx;
 
-  try {
     /* =================================================
      * BRANDING
      * ================================================= */
@@ -413,11 +412,6 @@ if (sendEmail && env.ADMIN_NOTIFICATION && !dryRun) {
       ? "No emails sent. Check skipped[] for reasons."
       : undefined
 });
-    
-  } catch (err) {
-    console.error("NOTIFY ERROR", err);
-    return json({ error: err.message }, 500);
-  }
 }
 // ---------------------------------------------
   // Normalize SMS to E164
