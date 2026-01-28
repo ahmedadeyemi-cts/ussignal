@@ -1904,56 +1904,57 @@ if (action === "notifySMS") {
   const alreadyNotified = !!APP_STATE.notifyStatus[id];
 
   showModal(
-  "Send SMS Notification",
-  `
-    <div>Send SMS notification to the on-call user(s) for this week?</div>
+    "Send SMS Notification",
+    `
+      <div>Send SMS notification to the on-call user(s) for this week?</div>
 
-    ${
-      alreadyNotified
-        ? `<div class="warning-box" style="margin-top:10px">
-             ⚠️ Already notified — force resend required
-           </div>`
-        : ""
-    }
+      ${
+        alreadyNotified
+          ? `<div class="warning-box" style="margin-top:10px">
+               ⚠️ Already notified — force resend required
+             </div>`
+          : ""
+      }
 
-    <div class="inline-row" style="margin-top:10px">
-      <label>
-        <input type="checkbox" id="forceResendChk" />
-        Force resend even if already notified
-      </label>
-    </div>
-  `,
-  "Confirm",
-  async () => {
-    const force = getForceResendChecked();
+      <div class="inline-row" style="margin-top:10px">
+        <label>
+          <input type="checkbox" id="forceResendChk" />
+          Force resend even if already notified
+        </label>
+      </div>
+    `,
+    "Confirm",
+    async () => {
+      const force = getForceResendChecked();
 
-    if (alreadyNotified && !force) {
-      toast("Already notified — force resend required", 4000);
-      return false;
-    }
+      if (alreadyNotified && !force) {
+        toast("Already notified — force resend required", 4000);
+        return false;
+      }
 
-    const res = await fetchAuth(`/api/admin/oncall/notify`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        mode: "sms",
-        entryId: id,
-        force,
-        retry: force,
-        auto: false
-      })
-    });
+      const res = await fetchAuth(`/api/admin/oncall/notify`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          mode: "sms",
+          entryId: id,
+          force,
+          retry: force,
+          auto: false
+        })
+      });
 
-    if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) throw new Error(await res.text());
 
-    await loadNotifyStatus();
-    renderScheduleAdmin(el);
-    toast("SMS notification sent.");
-    return true;
-  },
-  "Cancel"
-);
-  return;
+      await loadNotifyStatus();
+      renderScheduleAdmin(el);
+      toast("SMS notification sent.");
+      return true;
+    },
+    "Cancel"
+  );
+
+  return; // ✅ STOP here
 }
 
   el.querySelectorAll("input[data-time]").forEach(inp => {
