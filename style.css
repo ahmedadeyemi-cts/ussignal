@@ -852,3 +852,15 @@ body.dark .notify-badge.forced {
 .notify-badge.forced {
   cursor: help;
 }
+.inline-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inline-row label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
