@@ -1956,7 +1956,8 @@ if (action === "notifySMS") {
 
   return; // ✅ STOP here
 }
-
+   };   // ✅ CLOSE onclick
+  });    // ✅ CLOSE forEach
   el.querySelectorAll("input[data-time]").forEach(inp => {
     inp.onchange = () => {
       HAS_UNSAVED_CHANGES = true;
