@@ -1882,7 +1882,6 @@ confirmModalHtml(
         force: force
       })
     });
-return; // ✅ REQUIRED — prevents notifySMS nesting
 
     if (!res.ok) throw new Error(await res.text());
 
@@ -1893,7 +1892,8 @@ return; // ✅ REQUIRED — prevents notifySMS nesting
     return true;
   }
 );
-
+  return; // ✅ REQUIRED — prevents notifySMS nesting
+}
 if (action === "notifySMS") {
   const entry = APP_STATE.scheduleFull?.entries?.find(e => String(e.id) === String(id));
   if (!entry || isPastOnCall(entry)) {
