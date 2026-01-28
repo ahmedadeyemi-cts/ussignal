@@ -1,0 +1,20 @@
+name = "oncall-cron"
+main = "worker.js"
+compatibility_date = "2026-01-01"
+
+[[kv_namespaces]]
+binding = "ONCALL_KV"
+id = "e24b26bb9352494aab02480f12e0b920" #Retrieved From CloudFlare. KV namespace ID that your existing on-call system already uses.
+
+[vars]
+CRON_SHARED_SECRET = "7Seals^C"
+BREVO_SENDER_EMAIL = "oncall@onenecklab.com"
+BREVO_SENDER_NAME = "On-Call Weekly Schedule"
+ADMIN_NOTIFICATION = "ahmed.adeyemi@ussignal.com,kevin.damisch@ussignal.com,jason.mosier@ussignal.com,Bill.Emanuel@ussignal.com,Matthew.LeNoble@ussignal.com"
+SMS_PROVIDER_URL = "https://api.brevo.com/v3/transactionalSMS/send"
+
+[triggers]
+crons = [
+  "0 14 * * 1", # Monday 8am CST
+  "0 14 * * 5"  # Friday 8am CST
+]
