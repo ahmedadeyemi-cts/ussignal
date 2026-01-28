@@ -622,78 +622,10 @@ function hideModal() {
   modal.setAttribute("aria-hidden", "true");
 
 }
-async function openSmsNotifyModal(entryId, el) {
-  const entry = APP_STATE.scheduleFull?.entries?.find(e => String(e.id) === String(entryId));
-  if (!entry || isPastOnCall(entry)) {
-    toast("Cannot send SMS for past on-call weeks.");
-    return;
-  }
 
-  showModal(
-    "Send SMS Notification",
-    `
-      <div>Send SMS notification to the on-call user(s) for this week?</div>
-
-      ${
-        APP_STATE.notifyStatus[entryId]
-          ? `<div class="warning-box" style="margin-top:10px">
-               ⚠️ Already notified — force resend required
-             </div>`
-          : ""
-      }
-
-      <div class="inline-row" style="margin-top:10px">
-        <label>
-          <input type="checkbox" id="forceResendChk" />
-          Force resend even if already notified
-        </label>
-      </div>
-    `,
-    "Confirm",
-    async () => {
-      const force = getForceResendChecked();
-      const alreadyNotified = !!APP_STATE.notifyStatus[entryId];
-
-      if (alreadyNotified && !force) {
-        toast("Already notified — force resend required", 4000);
-        return false;
-      }
-
-      const res = await fetchAuth(`/api/admin/oncall/notify`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          mode: "sms",
-          entryId,
-          retry: force,
-          force,
-          auto: false
-        })
-      });
-
-      if (!res.ok) throw new Error(await res.text());
-
-      await loadNotifyStatus();
-      renderScheduleAdmin(el);
-      toast("SMS notification sent.");
-      return true;
-    },
-    "Cancel"
-  );
-}
 /* =========================
  * Force Resend Check Helper
  * ========================= */
-function getForceResendChecked() {
-  const modal = document.getElementById("modal");
-  if (!modal || !modal.classList.contains("modal-open")) {
-    return false;
-  }
-
-  const chk = modal.querySelector("#forceResendChk");
-  return chk ? chk.checked === true : false;
-}
-
 
 /* =========================
  * E164 Helper
@@ -1954,9 +1886,70 @@ confirmModalHtml(
   return; // ✅ REQUIRED — prevents notifySMS nesting
 }
 if (action === "notifySMS") {
-  openSmsNotifyModal(id, el);
+  const entry = APP_STATE.scheduleFull?.entries?.find(
+    e => String(e.id) === String(id)
+  );
+
+  if (!entry || isPastOnCall(entry)) {
+    toast("Cannot send SMS for past on-call weeks.");
+    return;
+  }
+
+  const alreadyNotified = !!APP_STATE.notifyStatus[id];
+
+  confirmModalHtml(
+    "Send SMS Notification",
+    `
+      <div>Send SMS notification to the on-call user(s) for this week?</div>
+
+      ${
+        alreadyNotified
+          ? `<div class="warning-box" style="margin-top:10px">
+               ⚠️ Already notified — force resend required
+             </div>`
+          : ""
+      }
+
+      <div class="inline-row" style="margin-top:10px">
+        <label>
+          <input type="checkbox" id="forceResendChk" />
+          Force resend even if already notified
+        </label>
+      </div>
+    `,
+    async () => {
+      const modal = document.getElementById("modal");
+      const force = modal?.querySelector("#forceResendChk")?.checked === true;
+
+      if (alreadyNotified && !force) {
+        toast("Already notified — force resend required", 4000);
+        return false; // ⛔ keep modal open
+      }
+
+      const res = await fetchAuth(`/api/admin/oncall/notify`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          mode: "sms",
+          entryId: id,
+          force,
+          retry: force,
+          auto: false
+        })
+      });
+
+      if (!res.ok) throw new Error(await res.text());
+
+      await loadNotifyStatus();
+      renderScheduleAdmin(el);
+      toast("SMS notification sent.");
+      return true; // ✅ close modal
+    }
+  );
+
   return;
 }
+
 
   el.querySelectorAll("input[data-time]").forEach(inp => {
     inp.onchange = () => {
