@@ -1903,7 +1903,7 @@ if (action === "notifySMS") {
     return;
   }
 
-  confirmModal(
+  confirmModalHtml(
   "Send SMS Notification",
   `
     <div>Send SMS notification to the on-call user(s) for this week?</div>
@@ -1915,13 +1915,13 @@ if (action === "notifySMS") {
     </div>
   `,
   async () => {
-   const alreadyNotified = !!APP_STATE.notifyStatus[id];
+    const alreadyNotified = !!APP_STATE.notifyStatus[id];
     const force = getForceResendChecked();
 
-if (alreadyNotified && !force) {
-  toast("Already notified — force resend required", 4000);
-  return false;
-}
+    if (alreadyNotified && !force) {
+      toast("Already notified — force resend required", 4000);
+      return false;
+    }
 
     const res = await fetchAuth(`/api/admin/oncall/notify`, {
       method: "POST",
@@ -1929,26 +1929,19 @@ if (alreadyNotified && !force) {
       body: JSON.stringify({
         mode: "sms",
         entryId: id,
-        retry: force,
-        force: force
+        force
       })
     });
 
-      if (!res.ok) throw new Error(await res.text());
+    if (!res.ok) throw new Error(await res.text());
 
-      // 🔑 Re-sync from KV (authoritative)
-await loadNotifyStatus();
+    await loadNotifyStatus();
+    renderScheduleAdmin(el);
+    toast("SMS notification sent.");
+    return true;
+  }
+);
 
-// 🔑 Re-render with persisted state
-renderScheduleAdmin(el);
-
-toast("SMS notification sent.");
-    }
-  );
-  return;
-}
-    };
-  });
   el.querySelectorAll("input[data-time]").forEach(inp => {
     inp.onchange = () => {
       HAS_UNSAVED_CHANGES = true;
