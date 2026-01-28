@@ -706,4 +706,3 @@ async function audit(env, CFG, record) {
     console.error("[audit] failed", err);
   }
 }
-}
