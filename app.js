@@ -626,7 +626,13 @@ function hideModal() {
 /* =========================
  * Force Resend Check Helper
  * ========================= */
+function getForceResendChecked() {
+  const modal = document.getElementById("modal");
+  if (!modal) return false;
 
+  const chk = modal.querySelector("#forceResendChk");
+  return chk?.checked === true;
+}
 /* =========================
  * E164 Helper
  * ========================= */
