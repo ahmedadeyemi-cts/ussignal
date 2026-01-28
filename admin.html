@@ -12,12 +12,22 @@
        ENTERPRISE UX ENHANCEMENTS
   ========================= -->
   <style>
-    /* ===== MODAL ===== */
-    .modal { opacity:0; pointer-events:none; transition:opacity 160ms ease; }
-    .modal.modal-open { opacity:1; pointer-events:auto; }
-    .modal-card { transform:translateY(12px) scale(.98); opacity:0; transition:all 180ms ease; }
-    .modal.modal-open .modal-card { transform:none; opacity:1; }
+  /* ===== MODAL ===== */
+  .modal { opacity:0; pointer-events:none; transition:opacity 160ms ease; }
+  .modal.modal-open { opacity:1; pointer-events:auto; }
+  .modal-card { transform:translateY(12px) scale(.98); opacity:0; transition:all 180ms ease; }
+  .modal.modal-open .modal-card { transform:none; opacity:1; }
 
+  /* ✅ IMPORTANT: force modal body to render HTML normally */
+  #modalBody {
+    white-space: normal;
+    font-family: inherit;
+  }
+
+  /* If style.css applies code/pre styles to divs inside the modal, normalize them */
+  #modalBody * {
+    white-space: normal;
+  }
     /* ===== CURRENT ON-CALL BADGE ===== */
     .schedule-card.current-oncall {
       border-left: 6px solid #16a34a;
