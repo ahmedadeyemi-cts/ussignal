@@ -257,7 +257,7 @@ if (skipSms) {
   emailTo.push({ email: p.email, name: p.name || "On-Call" });
 }
 
-        if (sendSMS && p.phone && inWindow && notifyType === "START_TODAY") {
+        if (sendSMS && p.phone && (force || notifyType === "START_TODAY")) {
   const e164 = normalizeToE164(p.phone, "US");
 
   if (e164) {
