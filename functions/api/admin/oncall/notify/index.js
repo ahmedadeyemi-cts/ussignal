@@ -677,7 +677,8 @@ async function sendBrevoSms(env, { to, message }) {
       "api-key": env.BREVO_API_KEY
     },
     body: JSON.stringify({
-      sender: env.SMS_SENDER_ID || "USSignal",
+      //sender: env.SMS_SENDER_ID || "USSignal",
+      sender: null,
       to,
       message
     })
