@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>SMS Opt-In</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont;
+      background: #f8fafc;
+      padding: 40px;
+    }
+    .card {
+      max-width: 420px;
+      margin: auto;
+      background: #ffffff;
+      border-radius: 8px;
+      padding: 24px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+    }
+    label {
+      font-weight: 600;
+      display: block;
+      margin-top: 16px;
+    }
+    input[type="tel"] {
+      width: 100%;
+      padding: 10px;
+      margin-top: 6px;
+      font-size: 16px;
+    }
+    .optin {
+      margin-top: 16px;
+      border: 1px solid #e5e7eb;
+      padding: 12px;
+      border-radius: 6px;
+      background: #f9fafb;
+      font-size: 14px;
+    }
+    .optin input {
+      margin-right: 6px;
+    }
+    button {
+      margin-top: 20px;
+      width: 100%;
+      padding: 12px;
+      background: #002b5c;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <h2>SMS On-Call Notifications</h2>
+
+  <form method="POST" action="/api/optin/sms">
+    <label for="phone">Phone Number *</label>
+    <input
+      id="phone"
+      name="phone"
+      type="tel"
+      placeholder="+1XXXXXXXXXX"
+      required
+    />
+
+    <div class="optin">
+      <label>
+        <input type="checkbox" name="sms_optin" required />
+        I agree to receive automated SMS notifications related to on-call
+        support. Message frequency may vary. Message & data rates may apply.
+        Reply STOP to opt out. Reply HELP for assistance. Your mobile information
+        will not be sold or shared with third parties.
+      </label>
+    </div>
+
+    <button type="submit">Sign Up</button>
+  </form>
+</div>
+
+</body>
+</html>
