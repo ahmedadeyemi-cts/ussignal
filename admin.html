@@ -97,6 +97,18 @@
   letter-spacing: 1px;
   text-align: center;
 }
+    .table {
+  width:100%;
+  border-collapse:collapse;
+  margin-top:10px;
+}
+
+.table th,
+.table td {
+  padding:8px 10px;
+  border-bottom:1px solid #e5e7eb;
+  text-align:left;
+}
 
   </style>
 </head>
@@ -178,13 +190,32 @@
 </section>
 
   <!-- WHO'S ON CALL NOW -->
-  <section id="currentTab" class="panel">
-    <div class="panel-head">
-      <h2>Who’s On Call Now</h2>
-      <div class="small subtle">Live · Inline editable · Auto-refreshing</div>
-    </div>
-    <div id="currentOnCall"></div>
-  </section>
+ <section id="currentTab" class="panel">
+  <div class="panel-head">
+    <h2>Who’s On Call Now</h2>
+    <div class="small subtle">Live · Inline editable · Auto-refreshing</div>
+  </div>
+
+  <!-- Current on-call engineer card -->
+  <div id="currentOnCall"></div>
+
+  <!-- ACKNOWLEDGEMENT DASHBOARD -->
+  <h3 style="margin-top:20px">Engineer Acknowledgements</h3>
+
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Department</th>
+        <th>Engineer</th>
+        <th>Email</th>
+        <th>Status</th>
+        <th>Confirmed At</th>
+      </tr>
+    </thead>
+    <tbody id="ackBody"></tbody>
+  </table>
+
+</section>
 
   <!-- TIMELINE -->
   <section id="timelineTab" class="panel">
