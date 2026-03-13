@@ -3107,13 +3107,15 @@ row.className =
 let CURRENT_ONCALL_TIMER = null;
 
 function startCurrentOnCallAutoRefresh() {
+
   if (CURRENT_ONCALL_TIMER) return;
 
   renderCurrentOnCall();
 
   CURRENT_ONCALL_TIMER = setInterval(() => {
-    renderCurrentOnCall();
-  }, 60_000); // every minute
+    renderCurrentOnCall();  // refresh card
+  }, 30_000);               // every 30 sec
+
 }
 
 function stopCurrentOnCallAutoRefresh() {
