@@ -3190,7 +3190,24 @@ setInterval(async () => {
 /* =========================
  * On-Call Acknowledgement Dashboard
  * ========================= */
+function minutesBetween(startISO, acknowledgedAt) {
+  try {
+    const start = isoToDateLocalAssumed(startISO);
+    const ack = new Date(acknowledgedAt);
 
+    const diff = Math.round((ack - start) / 60000);
+
+    if (diff < 1) return "instant";
+    if (diff < 60) return `${diff} min`;
+
+    const hrs = Math.floor(diff / 60);
+    const mins = diff % 60;
+
+    return `${hrs}h ${mins}m`;
+  } catch {
+    return "";
+  }
+}
 async function loadAckStatus(entry) {
   if (!entry) return;
 
@@ -3215,9 +3232,38 @@ async function loadAckStatus(entry) {
 
       const ack = ackMap[person.email];
 
-      const status = ack
-        ? `<span style="color:#16a34a;font-weight:600">Confirmed</span>`
-        : `<span style="color:#f59e0b;font-weight:600">Pending</span>`;
+      let status;
+
+const start = isoToDateLocalAssumed(entry.startISO);
+const now = new Date();
+const minutesSinceStart = Math.round((now - start) / 60000);
+
+if (ack) {
+  const timeToAck = minutesBetween(entry.startISO, ack.acknowledgedAt);
+  const ackMinutes = Math.round((new Date(ack.acknowledgedAt) - start) / 60000);
+
+  let color = "#16a34a"; // green
+  if (ackMinutes > 30) color = "#f59e0b"; // orange warning
+
+  status = `
+    <span style="color:${color};font-weight:600">
+      Confirmed (${timeToAck})
+    </span>
+  `;
+
+} else {
+
+  if (minutesSinceStart > 30) {
+    status = `
+      <span style="color:#dc2626;font-weight:700">
+        Pending (${minutesSinceStart} min overdue)
+      </span>
+    `;
+  } else {
+    status = `<span style="color:#f59e0b;font-weight:600">Pending</span>`;
+  }
+
+}
 
       const confirmedAt = ack
         ? new Date(ack.acknowledgedAt).toLocaleString("en-US")
