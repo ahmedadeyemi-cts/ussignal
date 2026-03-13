@@ -1198,6 +1198,7 @@ async function renderCurrentOnCall() {
       </div>
     </div>
   `;
+  loadAckStatus(entry);
 }
 
 
@@ -3186,7 +3187,57 @@ setInterval(async () => {
     }
   }
 }, 60_000);
+/* =========================
+ * On-Call Acknowledgement Dashboard
+ * ========================= */
 
+async function loadAckStatus(entry) {
+  if (!entry) return;
+
+  try {
+
+    const res = await fetchPublic(`/api/oncall/ack-status?entryId=${entry.id}`);
+    if (!res.ok) return;
+
+    const data = await res.json();
+    const ackMap = {};
+
+    (data.acknowledgements || []).forEach(a => {
+      ackMap[a.email] = a;
+    });
+
+    const body = byId("ackBody");
+    if (!body) return;
+
+    body.innerHTML = "";
+
+    Object.entries(entry.departments || {}).forEach(([dep, person]) => {
+
+      const ack = ackMap[person.email];
+
+      const status = ack
+        ? `<span style="color:#16a34a;font-weight:600">Confirmed</span>`
+        : `<span style="color:#f59e0b;font-weight:600">Pending</span>`;
+
+      const confirmedAt = ack
+        ? new Date(ack.acknowledgedAt).toLocaleString("en-US")
+        : "—";
+
+      body.insertAdjacentHTML("beforeend", `
+        <tr>
+          <td>${escapeHtml(DEPT_LABELS[dep] || dep)}</td>
+          <td>${escapeHtml(person.name || "")}</td>
+          <td>${escapeHtml(person.email || "")}</td>
+          <td>${status}</td>
+          <td>${escapeHtml(confirmedAt)}</td>
+        </tr>
+      `);
+    });
+
+  } catch (err) {
+    console.error("Ack status load failed:", err);
+  }
+}
 // =========================
 // BOOTSTRAP (MODULE SAFE)
 // =========================
