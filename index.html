@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
+
 <meta charset="UTF-8">
 <title>US Signal | On-Call Schedule</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -10,41 +12,46 @@
 
 <style>
 
-/* ------------------------------
-US SIGNAL DESIGN TOKENS
------------------------------- */
+/* ==============================
+GLOBAL DESIGN TOKENS
+============================== */
 
 :root{
 --us-navy:#0b2d5b;
 --us-navy-soft:#e6eef8;
 --card:#ffffff;
 --muted:#6b7280;
+--border:rgba(0,0,0,.06);
 }
 
+/* ==============================
+BASE
+============================== */
+
 body{
+margin:0;
 font-family:system-ui,-apple-system,Segoe UI,Roboto;
 background:#f5f7fb;
-margin:0;
 color:#1f2937;
 }
 
-/* ------------------------------
+/* ==============================
 HEADER
------------------------------- */
+============================== */
 
 .topbar{
 display:flex;
 justify-content:space-between;
 align-items:center;
-padding:14px 20px;
+padding:14px 22px;
 background:white;
-border-bottom:1px solid rgba(0,0,0,.06);
+border-bottom:1px solid var(--border);
 }
 
 .brand{
 display:flex;
-gap:12px;
 align-items:center;
+gap:12px;
 }
 
 .logo{
@@ -58,18 +65,18 @@ font-size:16px;
 
 .brand-sub{
 font-size:12px;
-color:#6b7280;
+color:var(--muted);
 }
 
 .controls{
 display:flex;
-gap:10px;
+gap:12px;
 align-items:center;
 }
 
-/* ------------------------------
-PAY BUTTON
------------------------------- */
+/* ==============================
+PAY REQUEST BUTTON
+============================== */
 
 .pay-request-btn{
 display:inline-flex;
@@ -78,31 +85,30 @@ gap:8px;
 padding:9px 16px;
 border-radius:999px;
 background:linear-gradient(135deg,#0b2d5b,#123a6f);
-color:#fff;
+color:white;
 font-weight:600;
 font-size:13px;
 text-decoration:none;
 }
 
-/* ------------------------------
+/* ==============================
 TABS
------------------------------- */
+============================== */
 
 .tabs{
 display:flex;
 gap:6px;
 padding:10px;
 background:white;
-border-radius:12px;
 margin:16px;
-overflow-x:auto;
+border-radius:12px;
 }
 
 .tab{
 flex:1;
 padding:10px 14px;
-border-radius:10px;
 border:none;
+border-radius:10px;
 cursor:pointer;
 font-weight:600;
 background:transparent;
@@ -114,9 +120,9 @@ color:var(--us-navy);
 box-shadow:inset 0 -3px 0 var(--us-navy);
 }
 
-/* ------------------------------
+/* ==============================
 PANELS
------------------------------- */
+============================== */
 
 .container{
 max-width:1400px;
@@ -128,7 +134,7 @@ padding:0 16px 30px;
 display:none;
 opacity:0;
 transform:translateY(6px);
-transition:all .2s ease;
+transition:.2s ease;
 }
 
 .panel.active{
@@ -136,6 +142,10 @@ display:block;
 opacity:1;
 transform:translateY(0);
 }
+
+/* ==============================
+LIVE CARD
+============================== */
 
 .live-card{
 border-left:6px solid #0ea5e9;
@@ -146,32 +156,46 @@ margin-bottom:16px;
 }
 
 .subtle{
-color:var(--muted);
 font-size:13px;
+color:var(--muted);
 }
 
-/* ------------------------------
+/* ==============================
+FLASH CURRENT WEEK
+============================== */
+
+@keyframes flashWeek{
+0%{box-shadow:0 0 0 0 rgba(14,165,233,.45)}
+70%{box-shadow:0 0 0 10px rgba(14,165,233,0)}
+100%{box-shadow:0 0 0 0 rgba(14,165,233,0)}
+}
+
+.current-oncall{
+animation:flashWeek 2.5s infinite;
+border-radius:12px;
+}
+
+/* ==============================
 TIMELINE
------------------------------- */
+============================== */
 
 .timeline-track{
 display:flex;
-gap:12px;
 flex-wrap:wrap;
+gap:12px;
 }
 
 .timeline-block{
 background:white;
 border-radius:10px;
-padding:10px 12px;
+padding:12px;
 min-width:220px;
-box-shadow:0 1px 2px rgba(0,0,0,.06);
-border:1px solid rgba(0,0,0,.05);
+border:1px solid var(--border);
 }
 
-/* ------------------------------
+/* ==============================
 ACK BADGES
------------------------------- */
+============================== */
 
 .ack-badge{
 margin-left:8px;
@@ -201,9 +225,27 @@ background:#e5e7eb;
 color:#374151;
 }
 
-/* ------------------------------
-PS CUSTOMERS TABLE
------------------------------- */
+/* ==============================
+ESCALATION BANNER
+============================== */
+
+.escalation-banner{
+display:none;
+background:#fee2e2;
+color:#b91c1c;
+padding:12px 16px;
+margin:16px;
+border-radius:10px;
+font-weight:600;
+}
+
+.escalation-banner.active{
+display:block;
+}
+
+/* ==============================
+PS CUSTOMERS
+============================== */
 
 .ps-card{
 background:white;
@@ -215,25 +257,19 @@ box-shadow:0 2px 8px rgba(0,0,0,.06);
 .ps-table{
 width:100%;
 border-collapse:collapse;
-font-size:14px;
 }
 
 .ps-table th{
-text-align:left;
 font-size:12px;
 text-transform:uppercase;
-color:#6b7280;
 padding:10px;
-border-bottom:1px solid rgba(0,0,0,.08);
+border-bottom:1px solid var(--border);
+color:#6b7280;
 }
 
 .ps-table td{
 padding:12px;
-border-bottom:1px solid rgba(0,0,0,.05);
-}
-
-.ps-table tr:nth-child(even){
-background:rgba(0,0,0,.02);
+border-bottom:1px solid var(--border);
 }
 
 .ps-pin{
@@ -241,6 +277,16 @@ font-family:monospace;
 background:#f1f5f9;
 padding:4px 10px;
 border-radius:999px;
+}
+
+/* ==============================
+COUNTDOWN
+============================== */
+
+.rotation-countdown{
+font-weight:600;
+font-size:14px;
+margin-bottom:10px;
 }
 
 </style>
@@ -276,6 +322,10 @@ target="_blank">
 </div>
 </header>
 
+<div id="escalationBanner" class="escalation-banner">
+⚠ No engineer has acknowledged the on-call assignment.
+</div>
+
 <nav class="tabs">
 
 <button class="tab active" data-tab="scheduleTab">Full Schedule</button>
@@ -293,17 +343,25 @@ target="_blank">
 </section>
 
 <section id="currentTab" class="panel">
+
 <h2>Who’s On Call Now</h2>
-<div class="subtle">Live · Read-only · Auto-updated</div>
-<div id="currentOnCall" class="live-card"></div>
+
+<div class="rotation-countdown" id="rotationCountdown"></div>
+
+<div class="live-card" id="currentOnCall"></div>
+
 </section>
 
 <section id="timelineTab" class="panel">
-<h2>Timeline</h2>
+
+<h2>On-Call Timeline</h2>
+
 <div id="timeline" class="timeline-track"></div>
+
 </section>
 
 <section id="psCustomersTab" class="panel">
+
 <h2>OneAssist Customers</h2>
 <div class="subtle">Used to Validate OnCall</div>
 
@@ -321,9 +379,9 @@ target="_blank">
 
 <script>
 
-/* ------------------------------
+/* ==============================
 TAB SYSTEM
------------------------------- */
+============================== */
 
 const tabs=document.querySelectorAll(".tab")
 const panels=document.querySelectorAll(".panel")
@@ -335,17 +393,14 @@ tabs.forEach(t=>t.classList.remove("active"))
 panels.forEach(p=>p.classList.remove("active"))
 
 tab.classList.add("active")
-
-document
-.getElementById(tab.dataset.tab)
-.classList.add("active")
+document.getElementById(tab.dataset.tab).classList.add("active")
 
 })
 })
 
-/* ------------------------------
+/* ==============================
 AUTO SCROLL CURRENT WEEK
------------------------------- */
+============================== */
 
 const schedule=document.getElementById("schedule")
 
@@ -354,7 +409,7 @@ if(schedule){
 const observer=new MutationObserver(()=>{
 
 const current=
-schedule.querySelector(".current-oncall") ||
+schedule.querySelector(".current-oncall")||
 schedule.querySelector("[data-current-week='true']")
 
 if(current){
@@ -363,12 +418,65 @@ current.scrollIntoView({behavior:"smooth",block:"center"})
 
 })
 
-observer.observe(schedule,{
-childList:true,
-subtree:true
-})
+observer.observe(schedule,{childList:true,subtree:true})
 
 }
+
+/* ==============================
+ROTATION COUNTDOWN
+============================== */
+
+function startRotationCountdown(){
+
+const el=document.getElementById("rotationCountdown")
+
+setInterval(()=>{
+
+const now=new Date()
+
+const next=new Date()
+
+next.setHours(19,0,0,0)
+
+if(now>next) next.setDate(next.getDate()+7)
+
+const diff=next-now
+
+const d=Math.floor(diff/86400000)
+const h=Math.floor(diff%86400000/3600000)
+const m=Math.floor(diff%3600000/60000)
+
+el.textContent=`Next rotation change in ${d}d ${h}h ${m}m`
+
+},1000)
+
+}
+
+startRotationCountdown()
+
+/* ==============================
+ACK SLA MONITOR
+============================== */
+
+function monitorAcknowledgements(){
+
+setTimeout(()=>{
+
+const confirmed=document.querySelectorAll(".ack-confirmed")
+
+if(!confirmed.length){
+
+document
+.getElementById("escalationBanner")
+.classList.add("active")
+
+}
+
+},300000)
+
+}
+
+monitorAcknowledgements()
 
 </script>
 
