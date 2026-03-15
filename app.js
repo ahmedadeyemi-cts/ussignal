@@ -1224,7 +1224,7 @@ async function renderCurrentOnCall() {
         }
 
       }
-
+     window.__ACK_MAP__ = ackMap;
     }
 
   } catch (err) {
@@ -1286,8 +1286,11 @@ function renderDeptBlocks(
   editable,
   entryId,
   restrictToAllowedDepts,
-  ackMap = {}
+  ackMap
 ) {
+
+  // 🔑 fallback so badges work everywhere
+  ackMap = ackMap || window.__ACK_MAP__ || {};
 
   const deptKeys = Object.keys(depts || {});
   if (!deptKeys.length) {
