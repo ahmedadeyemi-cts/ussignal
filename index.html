@@ -419,105 +419,100 @@
   function activate(tabName, updateHash = true) {
     tabs.forEach(t => t.classList.toggle("active", t.dataset.tab === tabName));
     panels.forEach(p => p.classList.toggle("active", p.id === tabName));
-    if (updateHash) history.replaceState(null, "", "#" + tabName.replace("Tab",""));
+
+    if (updateHash) {
+      history.replaceState(null, "", "#" + tabName.replace("Tab", ""));
+    }
   }
 
-  tabs.forEach(btn => btn.addEventListener("click", () => activate(btn.dataset.tab)));
-
-  /* ===== KEYBOARD NAV ===== */
-  document.addEventListener("keydown", e => {
-    const active = tabs.findIndex(t => t.classList.contains("active"));
-    if (e.key === "ArrowRight" && tabs[active+1]) activate(tabs[active+1].dataset.tab);
-    if (e.key === "ArrowLeft" && tabs[active-1]) activate(tabs[active-1].dataset.tab);
-    if (e.key === "Home") activate("scheduleTab");
-    if (e.key === "End") activate("currentTab");
-
+  tabs.forEach(btn => {
+    btn.addEventListener("click", () => activate(btn.dataset.tab));
   });
 
-  /* ===== VELOCITY SWIPE (TABS) ===== */
-  let sx=0, st=0;
+  document.addEventListener("keydown", e => {
+    const active = tabs.findIndex(t => t.classList.contains("active"));
+    if (e.key === "ArrowRight" && tabs[active + 1]) activate(tabs[active + 1].dataset.tab);
+    if (e.key === "ArrowLeft" && tabs[active - 1]) activate(tabs[active - 1].dataset.tab);
+    if (e.key === "Home") activate("scheduleTab");
+    if (e.key === "End") activate("currentTab");
+  });
+
+  let sx = 0;
+  let st = 0;
+
   document.addEventListener("touchstart", e => {
     sx = e.touches[0].clientX;
     st = Date.now();
-  }, { passive:true });
+  }, { passive: true });
 
   document.addEventListener("touchend", e => {
     const dx = e.changedTouches[0].clientX - sx;
     const dt = Date.now() - st;
     const velocity = Math.abs(dx / dt);
+
     if (Math.abs(dx) > 60 && velocity > 0.35) {
       const i = tabs.findIndex(t => t.classList.contains("active"));
-      const next = dx < 0 ? i+1 : i-1;
+      const next = dx < 0 ? i + 1 : i - 1;
       if (tabs[next]) activate(tabs[next].dataset.tab);
     }
   });
 
- /* ===== TIMELINE OBSERVER + WEEK SWIPE ===== */
+  const targets = [
+    document.getElementById("timeline"),
+    document.getElementById("schedule")
+  ].filter(Boolean);
 
-const targets = [
-  document.getElementById("timeline"),
-  document.getElementById("schedule")
-].filter(Boolean);
+  targets.forEach(container => {
+    const observer = new MutationObserver(() => {
+      const current =
+        container.querySelector(".current-oncall") ||
+        container.querySelector("[data-current-week='true']");
 
-targets.forEach(container => {
-  const obs = new MutationObserver(() => {
-    const current =
-      container.querySelector(".current-oncall") ||
-      container.querySelector("[data-current-week='true']");
-
-    if (current) {
-      current.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
-  });
-
-  obs.observe(container, { childList: true, subtree: true });
-});
-
-
-/* ===== TIMELINE ANIMATION ===== */
-
-const timeline = document.getElementById("timeline");
-
-if (timeline) {
-
-  const obs = new MutationObserver(() => {
-
-    Array.from(timeline.children).forEach((row, i) => {
-      setTimeout(() => row.classList.add("animate-in"), i * 35);
+      if (current) {
+        current.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
     });
 
-    const today =
-      timeline.querySelector(".current-week") ||
-      timeline.querySelector("[data-current-week='true']");
-
-    if (today) {
-      today.classList.add("today-indicator");
-      today.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
-
+    observer.observe(container, { childList: true, subtree: true });
   });
 
-  obs.observe(timeline, { childList: true });
+  const timeline = document.getElementById("timeline");
 
-  let tsx = 0;
+  if (timeline) {
+    const timelineObserver = new MutationObserver(() => {
+      Array.from(timeline.children).forEach((row, i) => {
+        setTimeout(() => row.classList.add("animate-in"), i * 35);
+      });
 
-  timeline.addEventListener("touchstart", e => {
-    tsx = e.touches[0].clientX;
-  }, { passive: true });
+      const today =
+        timeline.querySelector(".current-week") ||
+        timeline.querySelector("[data-current-week='true']");
 
-  timeline.addEventListener("touchend", e => {
+      if (today) {
+        today.classList.add("today-indicator");
+        today.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    });
 
-    const dx = e.changedTouches[0].clientX - tsx;
+    timelineObserver.observe(timeline, { childList: true });
 
-    if (Math.abs(dx) > 80) {
-      timeline.dispatchEvent(
-        new CustomEvent(dx < 0 ? "timeline:next" : "timeline:prev")
-      );
-    }
+    let tsx = 0;
 
-  });
+    timeline.addEventListener("touchstart", e => {
+      tsx = e.touches[0].clientX;
+    }, { passive: true });
 
-}
+    timeline.addEventListener("touchend", e => {
+      const dx = e.changedTouches[0].clientX - tsx;
+
+      if (Math.abs(dx) > 80) {
+        timeline.dispatchEvent(
+          new CustomEvent(dx < 0 ? "timeline:next" : "timeline:prev")
+        );
+      }
+    });
+  }
+})();
 </script>
 
 </body>
