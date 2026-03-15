@@ -730,42 +730,39 @@ function escapeHtml(s) {
 }
 
 // =========================
-// SAFETY: Guard timeline observers (prevents JS crash)
+// SAFETY: Guard timeline observers
 // =========================
+
 const timelineEl = document.getElementById("timeline");
 
 if (timelineEl) {
-  const timeline = document.getElementById("timeline");
 
-  if (timeline) {
-    const obs = new MutationObserver(() => {
-      Array.from(timeline.children).forEach((r, i) => {
-        setTimeout(() => r.classList.add("animate-in"), i * 35);
-      });
+  const obs = new MutationObserver(() => {
 
-      const today =
-        timeline.querySelector(".current-week") ||
-        timeline.querySelector("[data-current-week='true']");
-
-      if (today) {
-        today.classList.add("today-indicator");
-      }
+    Array.from(timelineEl.children).forEach((r, i) => {
+      setTimeout(() => r.classList.add("animate-in"), i * 35);
     });
 
-    obs.observe(timeline, { childList: true });
-  }
+    const today =
+      timelineEl.querySelector(".current-week") ||
+      timelineEl.querySelector("[data-current-week='true']");
+
+    if (today) {
+      today.classList.add("today-indicator");
+    }
+
+  });
+
+  obs.observe(timelineEl, { childList: true });
 
   let tsx = 0;
 
-  timelineEl.addEventListener(
-    "touchstart",
-    e => {
-      tsx = e.touches[0].clientX;
-    },
-    { passive: true }
-  );
+  timelineEl.addEventListener("touchstart", e => {
+    tsx = e.touches[0].clientX;
+  }, { passive: true });
 
   timelineEl.addEventListener("touchend", e => {
+
     const dx = e.changedTouches[0].clientX - tsx;
 
     if (Math.abs(dx) > 80) {
@@ -773,5 +770,7 @@ if (timelineEl) {
         new CustomEvent(dx < 0 ? "timeline:next" : "timeline:prev")
       );
     }
+
   });
+
 }
