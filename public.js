@@ -769,8 +769,8 @@ if (timelineEl) {
 
   const obs = new MutationObserver(() => {
 
-    Array.from(timelineEl.children).forEach((r, i) => {
-      setTimeout(() => r.classList.add("animate-in"), i * 35);
+    Array.from(timelineEl.children).forEach((row, i) => {
+      setTimeout(() => row.classList.add("animate-in"), i * 35);
     });
 
     const today =
