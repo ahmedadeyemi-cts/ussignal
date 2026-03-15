@@ -457,44 +457,27 @@
     }
   });
 
-  const targets = [
-    document.getElementById("timeline"),
-    document.getElementById("schedule")
-  ].filter(Boolean);
+ /* ===== CURRENT WEEK AUTO-SCROLL ===== */
 
-  targets.forEach(container => {
-    const observer = new MutationObserver(() => {
-      const current =
-        container.querySelector(".current-oncall") ||
-        container.querySelector("[data-current-week='true']");
+const schedule = document.getElementById("schedule");
 
-      if (current) {
-        current.scrollIntoView({ behavior: "smooth", block: "center" });
-      }
-    });
+if (schedule) {
 
-    observer.observe(container, { childList: true, subtree: true });
+  const observer = new MutationObserver(() => {
+
+    const current =
+      schedule.querySelector(".current-oncall") ||
+      schedule.querySelector("[data-current-week='true']");
+
+    if (current) {
+      current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
   });
 
-  const timeline = document.getElementById("timeline");
+  observer.observe(schedule, { childList: true, subtree: true });
 
-  if (timeline) {
-    const timelineObserver = new MutationObserver(() => {
-      Array.from(timeline.children).forEach((row, i) => {
-        setTimeout(() => row.classList.add("animate-in"), i * 35);
-      });
-
-      const today =
-        timeline.querySelector(".current-week") ||
-        timeline.querySelector("[data-current-week='true']");
-
-      if (today) {
-        today.classList.add("today-indicator");
-        today.scrollIntoView({ behavior: "smooth", block: "center" });
-      }
-    });
-
-    timelineObserver.observe(timeline, { childList: true });
+}
 
     let tsx = 0;
 
