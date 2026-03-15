@@ -62,12 +62,24 @@ let LAST_HASH = null;
 let LAST_TIMELINE_HASH = null;
 
 document.addEventListener("DOMContentLoaded", () => {
+
   wireUI();
   showSkeletons();
-  loadAll().catch(err => console.error("[public] init loadAll failed:", err));
+
+  loadAll().catch(err =>
+    console.error("[public] init loadAll failed:", err)
+  );
+
+  // Refresh API data every 60s
   setInterval(() => {
-  safeRun("autoRefresh", () => loadAll());
-}, REFRESH_MS);
+    safeRun("autoRefresh", () => loadAll());
+  }, REFRESH_MS);
+
+  // Re-evaluate escalation badges every 30s
+  setInterval(() => {
+    safeRun("refreshCurrent", () => renderCurrent());
+  }, 30000);
+
 });
 
 function $(id) { return document.getElementById(id); }
@@ -178,9 +190,11 @@ await loadAck(entry.id);
 console.log("[public] current loaded:", !!STATE.current);
 }
 async function loadAck(entryId) {
+
   if (!entryId) return;
 
   try {
+
     const res = await fetch(`${ENDPOINTS.ack}?entryId=${entryId}`, { cache: "no-store" });
     if (!res.ok) return;
 
@@ -197,9 +211,16 @@ async function loadAck(entryId) {
 
     console.log("[public] acknowledgements loaded:", Object.keys(map).length);
 
+    // 🔥 IMPORTANT: force re-render so badges appear
+    renderCurrent();
+    renderSchedule();
+
   } catch (err) {
+
     console.warn("[public] ack load failed", err);
+
   }
+
 }
 /* =========================
  * OneAssist
