@@ -471,8 +471,29 @@ targets.forEach(container => {
 });
 
 
+ const timeline = document.getElementById("timeline");
+
+if (timeline) {
+
   const obs = new MutationObserver(() => {
+
     Array.from(timeline.children).forEach((r,i)=>{
+      setTimeout(()=>r.classList.add("animate-in"),i*35);
+    });
+
+    const today =
+      timeline.querySelector(".current-week") ||
+      timeline.querySelector("[data-current-week='true']");
+
+    if (today) {
+      today.classList.add("today-indicator");
+    }
+
+  });
+
+  obs.observe(timeline,{childList:true});
+
+}
       setTimeout(()=>r.classList.add("animate-in"),i*35);
     });
     const today =
