@@ -8,9 +8,30 @@
 
 "use strict";
 
+/* =========================
+   GLOBAL ERROR GUARD
+   ========================= */
+
+window.addEventListener("error", e => {
+  console.error("[public] uncaught error:", e.error || e.message);
+});
+
+window.addEventListener("unhandledrejection", e => {
+  console.error("[public] promise rejection:", e.reason);
+});
+
 console.log("[public] public.js loaded");
 
 const REFRESH_MS = 60_000;
+
+function safeRun(label, fn) {
+  try {
+    return fn();
+  } catch (err) {
+    console.error(`[public] ${label} failed:`, err);
+  }
+}
+
 const ENDPOINTS = {
   oncall: "/api/oncall",
   current: "/api/oncall/current",
@@ -44,7 +65,9 @@ document.addEventListener("DOMContentLoaded", () => {
   wireUI();
   showSkeletons();
   loadAll().catch(err => console.error("[public] init loadAll failed:", err));
-  setInterval(() => loadAll().catch(()=>{}), REFRESH_MS);
+  setInterval(() => {
+  safeRun("autoRefresh", () => loadAll());
+}, REFRESH_MS);
 });
 
 function $(id) { return document.getElementById(id); }
@@ -278,12 +301,19 @@ function cryptoIdFallback(e) {
  * ========================= */
 
 function renderAll() {
-  renderLastUpdated();
-  ensureJumpButton();
-  renderTimeline();
-  renderCurrent();
-  renderSchedule();
-  renderPsCustomers();
+
+  safeRun("renderLastUpdated", () => renderLastUpdated());
+
+  safeRun("ensureJumpButton", () => ensureJumpButton());
+
+  safeRun("renderTimeline", () => renderTimeline());
+
+  safeRun("renderCurrent", () => renderCurrent());
+
+  safeRun("renderSchedule", () => renderSchedule());
+
+  safeRun("renderPsCustomers", () => renderPsCustomers());
+
 }
 
 function showSkeletons() {
