@@ -33,6 +33,7 @@ let STATE = {
   psCustomers: [],
   loading: true
 };
+const ACK_ESCALATION_MINUTES = 30;
 /* =========================
  * RENDER / FETCH HASHES
  * ========================= */
@@ -492,7 +493,29 @@ function renderSchedule() {
     `;
   }
 }
+function renderSmartAckBadge(person, entry) {
 
+  if (!person?.email) {
+    return `<span class="ack-badge ack-unknown">Unknown</span>`;
+  }
+
+  const ack = STATE.ackMap[(person.email || "").toLowerCase()];
+
+  const start = parseLocalISO(entry.startISO);
+  const now = new Date();
+
+  const minutesSinceStart = Math.floor((now - start) / 60000);
+
+  if (ack) {
+    return `<span class="ack-badge ack-confirmed">Confirmed</span>`;
+  }
+
+  if (minutesSinceStart >= ACK_ESCALATION_MINUTES) {
+    return `<span class="ack-badge ack-escalated">Escalated</span>`;
+  }
+
+  return `<span class="ack-badge ack-waiting">Waiting</span>`;
+}
 function renderEntryDepts(entry) {
 
   const depts = entry.departments || {};
@@ -506,13 +529,7 @@ function renderEntryDepts(entry) {
     const phone = (p.phone || "").trim();
     const tel = phone ? sanitizePhone(phone) : "";
 
-    const ack = STATE.ackMap[(p.email || "").toLowerCase()];
-
-    let badge = `<span class="ack-badge ack-waiting">Waiting</span>`;
-
-    if (ack) {
-      badge = `<span class="ack-badge ack-confirmed">Confirmed</span>`;
-    }
+    const badge = renderSmartAckBadge(p, entry);
 
     return `
       <div class="entry">
@@ -710,41 +727,51 @@ function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, c =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#039;" }[c])
   );
+}
+
 // =========================
 // SAFETY: Guard timeline observers (prevents JS crash)
 // =========================
 const timelineEl = document.getElementById("timeline");
 
 if (timelineEl) {
-const timeline = document.getElementById("timeline");
-if (timeline) {
-  const obs = new MutationObserver(() => {
-    Array.from(timeline.children).forEach((r,i)=>{
-      setTimeout(()=>r.classList.add("animate-in"),i*35);
+  const timeline = document.getElementById("timeline");
+
+  if (timeline) {
+    const obs = new MutationObserver(() => {
+      Array.from(timeline.children).forEach((r, i) => {
+        setTimeout(() => r.classList.add("animate-in"), i * 35);
+      });
+
+      const today =
+        timeline.querySelector(".current-week") ||
+        timeline.querySelector("[data-current-week='true']");
+
+      if (today) {
+        today.classList.add("today-indicator");
+      }
     });
-    const today =
-      timeline.querySelector(".current-week") ||
-      timeline.querySelector("[data-current-week='true']");
-    if (today) {
-      today.classList.add("today-indicator");
-    }
-  });
-  obs.observe(timeline,{childList:true});
-}
+
+    obs.observe(timeline, { childList: true });
+  }
 
   let tsx = 0;
-  timelineEl.addEventListener("touchstart", e => {
-    tsx = e.touches[0].clientX;
-  }, { passive: true });
+
+  timelineEl.addEventListener(
+    "touchstart",
+    e => {
+      tsx = e.touches[0].clientX;
+    },
+    { passive: true }
+  );
 
   timelineEl.addEventListener("touchend", e => {
     const dx = e.changedTouches[0].clientX - tsx;
+
     if (Math.abs(dx) > 80) {
       timelineEl.dispatchEvent(
         new CustomEvent(dx < 0 ? "timeline:next" : "timeline:prev")
       );
     }
   });
-}
-
 }
