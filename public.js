@@ -14,6 +14,7 @@ const REFRESH_MS = 60_000;
 const ENDPOINTS = {
   oncall: "/api/oncall",
   current: "/api/oncall/current",
+  ack: "/api/oncall/ack-status",
   psCustomers: "/api/ps-customers"
 };
 
@@ -28,6 +29,7 @@ let STATE = {
   entries: [],
   updatedAt: null,
   current: null,
+  ackMap: {},
   psCustomers: [],
   loading: true
 };
@@ -147,7 +149,33 @@ async function loadCurrent() {
   entry.departments = entry.departments || {};
   STATE.current = entry;
 
-  console.log("[public] current loaded:", !!STATE.current);
+await loadAck(entry.id);
+
+console.log("[public] current loaded:", !!STATE.current);
+}
+async function loadAck(entryId) {
+  if (!entryId) return;
+
+  try {
+    const res = await fetch(`${ENDPOINTS.ack}?entryId=${entryId}`, { cache: "no-store" });
+    if (!res.ok) return;
+
+    const data = await res.json();
+
+    const map = {};
+
+    (data.acknowledgements || []).forEach(a => {
+      if (!a.email) return;
+      map[a.email.toLowerCase()] = a;
+    });
+
+    STATE.ackMap = map;
+
+    console.log("[public] acknowledgements loaded:", Object.keys(map).length);
+
+  } catch (err) {
+    console.warn("[public] ack load failed", err);
+  }
 }
 /* =========================
  * OneAssist
@@ -466,21 +494,37 @@ function renderSchedule() {
 }
 
 function renderEntryDepts(entry) {
+
   const depts = entry.departments || {};
   const keys = Object.keys(depts);
 
   if (!keys.length) return `<div class="subtle">No assignments.</div>`;
 
   return keys.map(dep => {
+
     const p = depts[dep] || {};
     const phone = (p.phone || "").trim();
     const tel = phone ? sanitizePhone(phone) : "";
 
+    const ack = STATE.ackMap[(p.email || "").toLowerCase()];
+
+    let badge = `<span class="ack-badge ack-waiting">Waiting</span>`;
+
+    if (ack) {
+      badge = `<span class="ack-badge ack-confirmed">Confirmed</span>`;
+    }
+
     return `
       <div class="entry">
         <h4>${escapeHtml(prettyDept(dep))}</h4>
-        <div><b>${escapeHtml(p.name || "")}</b></div>
+
+        <div>
+          <b>${escapeHtml(p.name || "")}</b>
+          ${badge}
+        </div>
+
         <div class="small">${escapeHtml(p.email || "")}</div>
+
         ${
           phone
             ? `<a class="small tel-link" href="tel:${escapeHtml(tel)}">${escapeHtml(phone)}</a>`
@@ -488,6 +532,7 @@ function renderEntryDepts(entry) {
         }
       </div>
     `;
+
   }).join("");
 }
 function hashEntries(entries) {
