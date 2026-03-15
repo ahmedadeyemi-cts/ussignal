@@ -110,6 +110,17 @@ async function loadAll() {
     loadCurrent(),
     loadPsCustomers()
   ]);
+   if (STATE.current) {
+  const match = STATE.entries.find(e =>
+    e.startISO === STATE.current.startISO &&
+    e.endISO === STATE.current.endISO
+  );
+
+  if (match?.id) {
+    STATE.current.id = match.id;
+    await loadAck(match.id);
+  }
+}
 
   STATE.loading = false;
 
@@ -199,7 +210,6 @@ STATE.current = entry;
 
 console.log("[public] current entry id:", entry.id);
 
-await loadAck(entry.id);
 console.log("[public] current loaded:", !!STATE.current);
 }
 async function loadAck(entryId) {
