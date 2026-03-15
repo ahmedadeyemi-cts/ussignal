@@ -224,14 +224,14 @@ async function loadAck(entryId) {
     const data = await res.json();
 
     const map = {};
-
+     console.log("ENTRY ID USED FOR ACK:", entry.id);
     (data.acknowledgements || []).forEach(a => {
       if (!a.email) return;
       map[a.email.toLowerCase()] = a;
     });
 
     STATE.ackMap = map;
-
+    console.log("[ACK MAP]", STATE.ackMap);
     console.log("[public] acknowledgements loaded:", Object.keys(map).length);
 
     // 🔥 IMPORTANT: force re-render so badges appear
@@ -573,7 +573,7 @@ function renderSmartAckBadge(person, entry) {
     return `<span class="ack-badge ack-unknown">Unknown</span>`;
   }
 
-  const ack = STATE.ackMap[(person.email || "").toLowerCase()];
+  const ack = STATE.ackMap[(person.email || "").trim().toLowerCase()];
 
   const start = parseLocalISO(entry.startISO);
   const now = new Date();
