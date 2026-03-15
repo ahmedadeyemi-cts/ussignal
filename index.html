@@ -476,24 +476,6 @@ if (schedule) {
   });
 
   observer.observe(schedule, { childList: true, subtree: true });
-
-}
-
-    let tsx = 0;
-
-    timeline.addEventListener("touchstart", e => {
-      tsx = e.touches[0].clientX;
-    }, { passive: true });
-
-    timeline.addEventListener("touchend", e => {
-      const dx = e.changedTouches[0].clientX - tsx;
-
-      if (Math.abs(dx) > 80) {
-        timeline.dispatchEvent(
-          new CustomEvent(dx < 0 ? "timeline:next" : "timeline:prev")
-        );
-      }
-    });
   }
 })();
 </script>
