@@ -35,7 +35,7 @@ function safeRun(label, fn) {
 const ENDPOINTS = {
   oncall: "/api/oncall",
   current: "/api/oncall/current",
-  ack: "/api/oncall/ack-status",
+  ack: "/api/ack-status",
   psCustomers: "/api/ps-customers"
 };
 
