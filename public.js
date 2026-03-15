@@ -124,13 +124,14 @@ async function loadAll() {
 
   STATE.loading = false;
 
-  if (before !== LAST_HASH) {
-    renderAll();
-  } else {
-    renderLastUpdated();
-    renderCurrent();
-    renderPsCustomers(); // ✅ ADD THIS LINE
-  }
+if (before !== LAST_HASH) {
+  renderAll();
+} else {
+  renderLastUpdated();
+  renderCurrent();
+  renderSchedule();   // <-- ADD THIS
+  renderPsCustomers();
+}
 }
 function isArchived(entry) {
   const end = parseLocalISO(entry.endISO);
