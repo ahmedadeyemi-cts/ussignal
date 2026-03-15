@@ -3215,7 +3215,7 @@ async function loadAckStatus(entry) {
 
   try {
 
-    const res = await fetchPublic(`/api/oncall/ack-status?entryId=${entry.id}`);
+    const res = await fetchPublic(`/api/ack-status?entryId=${entry.id}`);
     if (!res.ok) return;
 
     const data = await res.json();
