@@ -482,11 +482,23 @@ function renderAckBadge(person, ackMap) {
   }
 
   const email = person.email.toLowerCase();
-
-  const ack = ackMap[email];
+  const ack = ackMap?.[email];
 
   if (ack) {
     return `<span class="ack-badge ack-confirmed">Confirmed</span>`;
+  }
+
+  // 🔴 Escalation logic (30 minutes)
+  const currentEntry = window.__CURRENT_ONCALL_ENTRY__;
+
+  if (currentEntry) {
+    const start = isoToDateLocalAssumed(currentEntry.startISO);
+    const now = new Date();
+    const mins = Math.round((now - start) / 60000);
+
+    if (mins > 30) {
+      return `<span class="ack-badge ack-escalated">Escalated</span>`;
+    }
   }
 
   return `<span class="ack-badge ack-waiting">Waiting</span>`;
@@ -1174,10 +1186,16 @@ async function renderCurrentOnCall() {
   const el = byId("currentOnCall");
   if (!el) return;
 
-  // 1️⃣ Authoritative source
+  /* ============================================================
+     1️⃣ Get current entry
+  ============================================================ */
+
   let entry = await loadCurrentOnCall();
 
-  // 2️⃣ Fallback (legacy / safety)
+  /* ============================================================
+     2️⃣ Fallback (legacy schedule sources)
+  ============================================================ */
+
   if (!entry) {
 
     const source =
@@ -1191,16 +1209,23 @@ async function renderCurrentOnCall() {
 
   }
 
+  /* ============================================================
+     3️⃣ No active on-call
+  ============================================================ */
+
   if (!entry) {
 
     el.innerHTML = `<div class="subtle">No one is currently on call.</div>`;
-
     return;
 
   }
 
+  /* Store current entry globally for escalation logic */
+
+  window.__CURRENT_ONCALL_ENTRY__ = entry;
+
   /* ============================================================
-     LOAD ACKNOWLEDGEMENTS
+     4️⃣ Load acknowledgements
   ============================================================ */
 
   let ackMap = {};
@@ -1213,7 +1238,7 @@ async function renderCurrentOnCall() {
 
       const data = await res.json();
 
-      if (data?.acknowledgements) {
+      if (Array.isArray(data?.acknowledgements)) {
 
         for (const a of data.acknowledgements) {
 
@@ -1224,7 +1249,7 @@ async function renderCurrentOnCall() {
         }
 
       }
-     window.__ACK_MAP__ = ackMap;
+
     }
 
   } catch (err) {
@@ -1233,8 +1258,12 @@ async function renderCurrentOnCall() {
 
   }
 
+  /* Make acknowledgement map globally available */
+
+  window.__ACK_MAP__ = ackMap;
+
   /* ============================================================
-     RENDER CURRENT ONCALL CARD
+     5️⃣ Render the live on-call card
   ============================================================ */
 
   el.innerHTML = `
@@ -1270,13 +1299,12 @@ async function renderCurrentOnCall() {
   `;
 
   /* ============================================================
-     UPDATE ACK TABLE
+     6️⃣ Update acknowledgement dashboard (admin page)
   ============================================================ */
 
   loadAckStatus(entry);
 
 }
-
 /* =========================
  * Shared Dept Renderer
  * ========================= */
@@ -1289,7 +1317,6 @@ function renderDeptBlocks(
   ackMap
 ) {
 
-  // 🔑 fallback so badges work everywhere
   ackMap = ackMap || window.__ACK_MAP__ || {};
 
   const deptKeys = Object.keys(depts || {});
