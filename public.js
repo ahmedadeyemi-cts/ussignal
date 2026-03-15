@@ -182,11 +182,24 @@ async function loadCurrent() {
   }
 
   // Ensure departments object exists
-  entry.departments = entry.departments || {};
-  STATE.current = entry;
+ entry.departments = entry.departments || {};
+
+/* 🔧 Ensure entryId exists */
+if (!entry.id) {
+  const match = STATE.entries.find(e =>
+    e.startISO === entry.startISO &&
+    e.endISO === entry.endISO
+  );
+  if (match) {
+    entry.id = match.id;
+  }
+}
+
+STATE.current = entry;
+
+console.log("[public] current entry id:", entry.id);
 
 await loadAck(entry.id);
-
 console.log("[public] current loaded:", !!STATE.current);
 }
 async function loadAck(entryId) {
