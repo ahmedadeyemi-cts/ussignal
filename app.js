@@ -1281,7 +1281,14 @@ async function renderCurrentOnCall() {
  * Shared Dept Renderer
  * ========================= */
 
-function renderDeptBlocks(depts, editable, entryId, restrictToAllowedDepts) {
+function renderDeptBlocks(
+  depts,
+  editable,
+  entryId,
+  restrictToAllowedDepts,
+  ackMap = {}
+) {
+
   const deptKeys = Object.keys(depts || {});
   if (!deptKeys.length) {
     return `<div class="entry"><h4>—</h4><div class="small">No assignment</div></div>`;
@@ -1292,39 +1299,50 @@ function renderDeptBlocks(depts, editable, entryId, restrictToAllowedDepts) {
   return deptKeys
     .filter(dep => !restrictToAllowedDepts || allowed.has(dep) || roleAtLeast(APP_STATE.role, "admin"))
     .map(dep => {
+
       const p = (depts || {})[dep] || {};
       const label = DEPT_LABELS[dep] || dep;
 
+      const ackBadge = renderAckBadge(p, ackMap);
+
       if (!editable) {
+
         return `
           <div class="entry">
             <h4>${escapeHtml(label)}</h4>
-            <div><b>${escapeHtml(p.name || "")}</b></div>
+
+            <div>
+              <b>${escapeHtml(p.name || "")}</b>
+              ${ackBadge}
+            </div>
+
             <div>${escapeHtml(p.email || "")}</div>
             <div class="small">${escapeHtml(p.phone || "")}</div>
           </div>
         `;
+
       }
 
-     return `
-  <div class="entry">
-    <h4>${escapeHtml(label)}</h4>
+      return `
+        <div class="entry">
+          <h4>${escapeHtml(label)}</h4>
 
-    <div class="inline-row">
-      <label>User</label>
-      ${renderRosterSelect(entryId, dep, p.email)}
-    </div>
+          <div class="inline-row">
+            <label>User</label>
+            ${renderRosterSelect(entryId, dep, p.email)}
+          </div>
 
-    <div class="small subtle">
-      Name & phone auto-filled from roster
-    </div>
+          <div class="small subtle">
+            Name & phone auto-filled from roster
+          </div>
 
-    <div class="small">
-      <b>${escapeHtml(p.name || "")}</b><br/>
-      ${escapeHtml(p.phone || "")}
-    </div>
-  </div>
-`;
+          <div class="small">
+            <b>${escapeHtml(p.name || "")}</b>
+            ${ackBadge}<br/>
+            ${escapeHtml(p.phone || "")}
+          </div>
+        </div>
+      `;
     })
     .join("");
 }
