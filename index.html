@@ -452,7 +452,8 @@
     }
   });
 
-  /* ===== TIMELINE OBSERVER + WEEK SWIPE ===== */
+ /* ===== TIMELINE OBSERVER + WEEK SWIPE ===== */
+
 const targets = [
   document.getElementById("timeline"),
   document.getElementById("schedule")
@@ -463,22 +464,26 @@ targets.forEach(container => {
     const current =
       container.querySelector(".current-oncall") ||
       container.querySelector("[data-current-week='true']");
+
     if (current) {
       current.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   });
+
   obs.observe(container, { childList: true, subtree: true });
 });
 
 
- const timeline = document.getElementById("timeline");
+/* ===== TIMELINE ANIMATION ===== */
+
+const timeline = document.getElementById("timeline");
 
 if (timeline) {
 
   const obs = new MutationObserver(() => {
 
-    Array.from(timeline.children).forEach((r,i)=>{
-      setTimeout(()=>r.classList.add("animate-in"),i*35);
+    Array.from(timeline.children).forEach((row, i) => {
+      setTimeout(() => row.classList.add("animate-in"), i * 35);
     });
 
     const today =
@@ -487,35 +492,32 @@ if (timeline) {
 
     if (today) {
       today.classList.add("today-indicator");
+      today.scrollIntoView({ behavior: "smooth", block: "center" });
     }
 
   });
 
-  obs.observe(timeline,{childList:true});
+  obs.observe(timeline, { childList: true });
+
+  let tsx = 0;
+
+  timeline.addEventListener("touchstart", e => {
+    tsx = e.touches[0].clientX;
+  }, { passive: true });
+
+  timeline.addEventListener("touchend", e => {
+
+    const dx = e.changedTouches[0].clientX - tsx;
+
+    if (Math.abs(dx) > 80) {
+      timeline.dispatchEvent(
+        new CustomEvent(dx < 0 ? "timeline:next" : "timeline:prev")
+      );
+    }
+
+  });
 
 }
-      setTimeout(()=>r.classList.add("animate-in"),i*35);
-    });
-    const today =
-      timeline.querySelector(".current-week") ||
-      timeline.querySelector("[data-current-week='true']");
-    if (today) {
-      today.classList.add("today-indicator");
-      today.scrollIntoView({ behavior:"smooth", block:"center" });
-    }
-  });
-  obs.observe(timeline,{childList:true});
-
-  let tsx=0;
-  timeline.addEventListener("touchstart",e=>tsx=e.touches[0].clientX,{passive:true});
-  timeline.addEventListener("touchend",e=>{
-    const dx=e.changedTouches[0].clientX-tsx;
-    if(Math.abs(dx)>80){
-      timeline.dispatchEvent(new CustomEvent(dx<0?"timeline:next":"timeline:prev"));
-    }
-  });
-
-})();
 </script>
 
 </body>
