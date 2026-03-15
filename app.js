@@ -3297,7 +3297,7 @@ async function loadAckStatus(entry) {
     const ackMap = {};
 
     (data.acknowledgements || []).forEach(a => {
-      ackMap[a.email] = a;
+      ackMap[a.email.toLowerCase()] = a;
     });
 
     const body = byId("ackBody");
@@ -3307,7 +3307,7 @@ async function loadAckStatus(entry) {
 
     Object.entries(entry.departments || {}).forEach(([dep, person]) => {
 
-      const ack = ackMap[person.email];
+      const ack = ackMap[(person.email || "").toLowerCase()];
 
       let status;
 
@@ -3349,7 +3349,8 @@ if (ack) {
       body.insertAdjacentHTML("beforeend", `
         <tr>
           <td>${escapeHtml(DEPT_LABELS[dep] || dep)}</td>
-          <td>${escapeHtml(person.name || "")}</td>
+          <td>${escapeHtml(person.name || "")}
+${renderAckBadge(person, ackMap)}</td>
           <td>${escapeHtml(person.email || "")}</td>
           <td>${status}</td>
           <td>${escapeHtml(confirmedAt)}</td>
