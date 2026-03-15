@@ -475,7 +475,22 @@ function onClick(id, fn) {
   const el = byId(id);
   if (el) el.onclick = fn;
 }
+function renderAckBadge(person, ackMap) {
 
+  if (!person || !person.email) {
+    return `<span class="ack-badge ack-unknown">Unknown</span>`;
+  }
+
+  const email = person.email.toLowerCase();
+
+  const ack = ackMap[email];
+
+  if (ack) {
+    return `<span class="ack-badge ack-confirmed">Confirmed</span>`;
+  }
+
+  return `<span class="ack-badge ack-waiting">Waiting</span>`;
+}
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, c =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#039;" }[c])
@@ -1155,6 +1170,7 @@ function renderScheduleReadOnly(el, entries) {
 }
 
 async function renderCurrentOnCall() {
+
   const el = byId("currentOnCall");
   if (!el) return;
 
@@ -1163,44 +1179,103 @@ async function renderCurrentOnCall() {
 
   // 2️⃣ Fallback (legacy / safety)
   if (!entry) {
+
     const source =
       (APP_STATE.draftSchedule?.entries?.length && APP_STATE.draftSchedule) ||
       (APP_STATE.scheduleFull?.entries?.length && APP_STATE.scheduleFull) ||
       APP_STATE.schedulePublic;
 
     const entries = source?.entries || [];
+
     entry = getCurrentOnCallEntry(entries);
+
   }
 
   if (!entry) {
+
     el.innerHTML = `<div class="subtle">No one is currently on call.</div>`;
+
     return;
+
   }
+
+  /* ============================================================
+     LOAD ACKNOWLEDGEMENTS
+  ============================================================ */
+
+  let ackMap = {};
+
+  try {
+
+    const res = await fetchPublic(`/api/ack-status?entryId=${entry.id}`);
+
+    if (res.ok) {
+
+      const data = await res.json();
+
+      if (data?.acknowledgements) {
+
+        for (const a of data.acknowledgements) {
+
+          if (!a?.email) continue;
+
+          ackMap[a.email.toLowerCase()] = a;
+
+        }
+
+      }
+
+    }
+
+  } catch (err) {
+
+    console.warn("Ack status load failed", err);
+
+  }
+
+  /* ============================================================
+     RENDER CURRENT ONCALL CARD
+  ============================================================ */
 
   el.innerHTML = `
     <div class="schedule-card current-oncall">
+
       <div class="card-head">
+
         <div class="card-title">
           ${escapeHtml(formatCSTFromChicagoLocal(entry.startISO))}
           →
           ${escapeHtml(formatCSTFromChicagoLocal(entry.endISO))}
         </div>
-        <div class="small subtle">Live · CST</div>
+
+        <div class="small subtle">
+          Live · CST
+        </div>
+
       </div>
 
       <div class="entry-grid">
+
         ${renderDeptBlocks(
           entry.departments,
           roleAtLeast(APP_STATE.role, "editor"),
           entry.id,
-          false
+          false,
+          ackMap
         )}
+
       </div>
+
     </div>
   `;
-  loadAckStatus(entry);
-}
 
+  /* ============================================================
+     UPDATE ACK TABLE
+  ============================================================ */
+
+  loadAckStatus(entry);
+
+}
 
 /* =========================
  * Shared Dept Renderer
