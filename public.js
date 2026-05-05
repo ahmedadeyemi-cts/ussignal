@@ -225,7 +225,8 @@ async function loadAck(entryId) {
     const data = await res.json();
 
     const map = {};
-     console.log("ENTRY ID USED FOR ACK:", entry.id);
+     /* console.log("ENTRY ID USED FOR ACK:", entry.id); */
+     console.log("ENTRY ID USED FOR ACK:", entryId);
     (data.acknowledgements || []).forEach(a => {
       if (!a.email) return;
       map[a.email.toLowerCase()] = a;
@@ -627,7 +628,7 @@ function renderEntryDepts(entry) {
 
   }).join("");
 }
-function hashEntries(entries) {
+/*function hashEntries(entries) {
   try {
     return JSON.stringify(
       entries.map(e => ({
@@ -635,6 +636,29 @@ function hashEntries(entries) {
         start: e.startISO,
         end: e.endISO,
         d: Object.keys(e.departments || {})
+      }))
+    );
+  } catch {
+    return String(Math.random());
+  }
+} */
+function hashEntries(entries) {
+  try {
+    return JSON.stringify(
+      entries.map(e => ({
+        id: e.id,
+        start: e.startISO,
+        end: e.endISO,
+        departments: Object.fromEntries(
+          Object.entries(e.departments || {}).map(([dept, p]) => [
+            dept,
+            {
+              name: p?.name || "",
+              email: p?.email || "",
+              phone: p?.phone || ""
+            }
+          ])
+        )
       }))
     );
   } catch {
