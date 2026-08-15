@@ -135,8 +135,8 @@ replace_once(
 )
 text = read(notify)
 count = text.count("env.PUBLIC_PORTAL_URL")
-if count != 2:
-    raise RuntimeError(f"{notify}: expected 2 PUBLIC_PORTAL_URL call-site matches, found {count}")
+if count != 3:
+    raise RuntimeError(f"{notify}: expected 3 PUBLIC_PORTAL_URL call-site matches, found {count}")
 write(notify, text.replace("env.PUBLIC_PORTAL_URL", "publicPortalUrl"))
 replace_once(
     notify,
