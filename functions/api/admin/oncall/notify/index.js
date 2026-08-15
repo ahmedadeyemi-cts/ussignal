@@ -84,6 +84,8 @@ export async function onRequest(ctx) {
     };
 
 
+    const publicPortalUrl = String(publicPortalUrl || "https://oncall.onenecklab.com/").trim();
+
     /* =================================================
      * PARSE REQUEST
      * ================================================= */
@@ -300,7 +302,7 @@ if (sendEmail && skipEmail) {
       notifyType === "UPCOMING"
         ? "On-Call Reminder – Upcoming Week"
         : "On-Call Starts Today – Action Required",
-    html: buildEmailHtml(BRAND, entry, tz, notifyType, env.PUBLIC_PORTAL_URL)
+    html: buildEmailHtml(BRAND, entry, tz, notifyType, publicPortalUrl)
   });
 
   await env.ONCALL_KV.put(
@@ -339,7 +341,7 @@ if (sendEmail && env.ADMIN_NOTIFICATION && !dryRun) {
         entry,
         tz,
         notifyType,
-        env.PUBLIC_PORTAL_URL
+        publicPortalUrl
       )
     });
   }
@@ -356,7 +358,7 @@ if (sendEmail && env.ADMIN_NOTIFICATION && !dryRun) {
           message: `US Signal On-Call: Your on-call duty starts now and ends ${formatCstFromIso(
             entry.endISO,
             tz
-          )}.`
+          )}. View schedule: ${publicPortalUrl}`
         });
       }
       smsSent++;
@@ -388,7 +390,7 @@ if (sendEmail && env.ADMIN_NOTIFICATION && !dryRun) {
        * TEAMS WEBHOOK (OPTIONAL)
        * --------------------------------------------- */
       if (env.TEAMS_WEBHOOK_URL && !dryRun) {
-        await sendTeamsWebhook(env.TEAMS_WEBHOOK_URL, entry, notifyType);
+        await sendTeamsWebhook(env.TEAMS_WEBHOOK_URL, entry, notifyType, publicPortalUrl);
       }
     }
 
@@ -693,13 +695,13 @@ async function sendBrevoSms(env, { to, message }) {
 
 
 
-async function sendTeamsWebhook(url, entry, type) {
+async function sendTeamsWebhook(url, entry, type, publicPortalUrl) {
   await fetch(url, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       title: "On-Call Notification",
-      text: `${type}: ${entry.startISO} → ${entry.endISO}`
+      text: `${type}: ${entry.startISO} → ${entry.endISO}. View schedule: ${publicPortalUrl}`
     })
   });
 }

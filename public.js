@@ -35,8 +35,7 @@ function safeRun(label, fn) {
 const ENDPOINTS = {
   oncall: "/api/oncall",
   current: "/api/oncall/current",
-  ack: "/api/ack-status",
-  psCustomers: "/api/ps-customers"
+  ack: "/api/ack-status"
 };
 
 const DEPT_LABELS = {
@@ -51,7 +50,6 @@ let STATE = {
   updatedAt: null,
   current: null,
   ackMap: {},
-  psCustomers: [],
   loading: true
 };
 const ACK_ESCALATION_MINUTES = 30;
@@ -107,8 +105,7 @@ async function loadAll() {
 
   await Promise.allSettled([
     loadSchedule(),
-    loadCurrent(),
-    loadPsCustomers()
+    loadCurrent()
   ]);
    if (STATE.current) {
   const match = STATE.entries.find(e =>
@@ -129,8 +126,7 @@ if (before !== LAST_HASH) {
 } else {
   renderLastUpdated();
   renderCurrent();
-  renderSchedule();   // <-- ADD THIS
-  renderPsCustomers();
+  renderSchedule();
 }
 }
 function isArchived(entry) {
@@ -248,33 +244,6 @@ async function loadAck(entryId) {
 
 }
 /* =========================
- * OneAssist
- * ========================= */
-async function loadPsCustomers() {
-  const res = await fetch(ENDPOINTS.psCustomers, { cache: "no-store" });
-  if (!res.ok) {
-    console.warn("[public] ps-customers fetch failed");
-    STATE.psCustomers = [];
-    return;
-  }
-
-  const raw = await res.json();
-
-  // Normalize defensively
-  let customers = [];
-
-  if (Array.isArray(raw)) {
-    customers = raw;
-  } else if (Array.isArray(raw.customers)) {
-    customers = raw.customers;
-  }
-
-  STATE.psCustomers = customers;
-
-  console.log("[public] ps customers loaded:", customers.length);
-}
-
-/* =========================
  * Normalization (KEY FIX)
  * ========================= */
 
@@ -357,8 +326,6 @@ function renderAll() {
   safeRun("renderCurrent", () => renderCurrent());
 
   safeRun("renderSchedule", () => renderSchedule());
-
-  safeRun("renderPsCustomers", () => renderPsCustomers());
 
 }
 
@@ -666,67 +633,6 @@ function hashEntries(entries) {
   }
 }
 
-function renderPsCustomers() {
-  const el = document.getElementById("psCustomers");
-  if (!el) return;
-
-  const list = STATE.psCustomers || [];
-
-  el.innerHTML = `
-    <div class="ps-card">
-      <div class="ps-card-head">
-        <div>
-          <h3>OneAssist Customers</h3>
-          <div class="subtle">Read-only reference · Used for IVR and SMS authentication</div>
-        </div>
-        <input
-          type="search"
-          class="ps-search"
-          placeholder="Search customers…"
-          aria-label="Search PS customers"
-        />
-      </div>
-
-      ${
-        !list.length
-          ? `<div class="subtle">No Professional Services customers available.</div>`
-          : `
-        <div class="ps-table-wrap">
-          <table class="ps-table">
-            <thead>
-              <tr>
-                <th>Customer</th>
-                <th>PIN</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${list.map(c => `
-                <tr>
-                  <td class="ps-name">${escapeHtml(c.name || "—")}</td>
-                  <td>
-                    <code class="ps-pin">${escapeHtml(c.pin || "—")}</code>
-                  </td>
-                </tr>
-              `).join("")}
-            </tbody>
-          </table>
-        </div>
-      `}
-    </div>
-  `;
-
-  // Client-side search
-  const search = el.querySelector(".ps-search");
-  if (search) {
-    search.addEventListener("input", () => {
-      const q = search.value.toLowerCase();
-      el.querySelectorAll("tbody tr").forEach(row => {
-        row.style.display =
-          row.textContent.toLowerCase().includes(q) ? "" : "none";
-      });
-    });
-  }
-}
 /* =========================
  * Filtering / Sorting
  * ========================= */
